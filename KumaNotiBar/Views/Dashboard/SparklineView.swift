@@ -11,17 +11,38 @@ struct SparklineView: View {
             let minVal = Double(dataPoints.min() ?? 0)
             let range = max(maxVal - minVal, 1)
 
-            var path = Path()
-            for (index, point) in dataPoints.enumerated() {
+            let points: [CGPoint] = dataPoints.enumerated().map { index, point in
                 let x = size.width * CGFloat(index) / CGFloat(dataPoints.count - 1)
-                let y = size.height * (1 - CGFloat(Double(point) - minVal) / range)
-                if index == 0 {
-                    path.move(to: CGPoint(x: x, y: y))
-                } else {
-                    path.addLine(to: CGPoint(x: x, y: y))
-                }
+                let y = size.height * (1 - (Double(point) - minVal) / range)
+                return CGPoint(x: x, y: y)
             }
-            context.stroke(path, with: .color(color), lineWidth: 1.5)
+
+            // Fill gradient under the line
+            var fillPath = Path()
+            fillPath.move(to: CGPoint(x: points[0].x, y: size.height))
+            for pt in points { fillPath.addLine(to: pt) }
+            fillPath.addLine(to: CGPoint(x: points.last!.x, y: size.height))
+            fillPath.closeSubpath()
+
+            let gradient = Gradient(colors: [color.opacity(0.3), color.opacity(0.05)])
+            context.fill(
+                fillPath,
+                with: .linearGradient(gradient, startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height))
+            )
+
+            // Stroke line
+            var linePath = Path()
+            for (i, pt) in points.enumerated() {
+                if i == 0 { linePath.move(to: pt) }
+                else { linePath.addLine(to: pt) }
+            }
+            context.stroke(linePath, with: .color(color), lineWidth: 1.5)
+
+            // Last point dot
+            if let last = points.last {
+                let dot = CGRect(x: last.x - 2, y: last.y - 2, width: 4, height: 4)
+                context.fill(Path(ellipseIn: dot), with: .color(color))
+            }
         }
     }
 }

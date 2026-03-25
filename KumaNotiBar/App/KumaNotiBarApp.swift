@@ -7,6 +7,7 @@ struct KumaNotiBarApp: App {
 
     @State private var menuBarVM: MenuBarViewModel?
     @State private var dashboardVM: DashboardViewModel?
+    @State private var showOnboarding = false
 
     var body: some Scene {
         MenuBarExtra {
@@ -22,6 +23,9 @@ struct KumaNotiBarApp: App {
                     Text("Configure a server in Settings")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Button("Setup Wizard...") {
+                        showOnboarding = true
+                    }
                     Button("Open Settings...") {
                         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                     }
@@ -46,6 +50,16 @@ struct KumaNotiBarApp: App {
                 setupViewModels()
             }
         }
+
+        Window("Welcome to Kuma NotiBar", id: "onboarding") {
+            OnboardingView(settingsStore: settingsStore) {
+                showOnboarding = false
+                setupViewModels()
+            }
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 
     init() {
@@ -66,6 +80,8 @@ struct KumaNotiBarApp: App {
                 service: service,
                 settingsStore: store
             ))
+        } else {
+            _showOnboarding = State(initialValue: !store.hasCompletedOnboarding)
         }
     }
 
@@ -85,6 +101,11 @@ struct KumaNotiBarApp: App {
 
         menuBarVM = mbVM
         dashboardVM = dbVM
+
+        Task {
+            _ = await NotificationManager.shared.requestPermission()
+        }
+
         mbVM.startPolling()
     }
 }

@@ -6,6 +6,7 @@ final class MenuBarViewModel {
     private let service: any MonitoringServiceProtocol
     private let settingsStore: SettingsStore
     let pollingEngine: PollingEngine
+    private let networkMonitor: NetworkMonitor
 
     var overallStatus: OverallStatus = .unreachable
     var upCount = 0
@@ -13,6 +14,9 @@ final class MenuBarViewModel {
     var lastCheckTime: Date?
     var hasActiveIncident = false
     var errorMessage: String?
+
+    private var previousMonitorStatuses: [String: MonitorStatus] = [:]
+    private var monitorDownSince: [String: Date] = [:]
 
     var iconStyle: MenuBarIconStyle { settingsStore.menuBarIconStyle }
     var statusColor: Color { overallStatus.color }
@@ -31,11 +35,14 @@ final class MenuBarViewModel {
     init(
         service: any MonitoringServiceProtocol,
         settingsStore: SettingsStore,
-        pollingEngine: PollingEngine
+        pollingEngine: PollingEngine,
+        networkMonitor: NetworkMonitor = NetworkMonitor()
     ) {
         self.service = service
         self.settingsStore = settingsStore
         self.pollingEngine = pollingEngine
+        self.networkMonitor = networkMonitor
+        self.networkMonitor.start()
     }
 
     func startPolling() {
@@ -57,6 +64,12 @@ final class MenuBarViewModel {
     }
 
     private func fetchStatus(connection: ServerConnection) async {
+        guard networkMonitor.isConnected else {
+            overallStatus = .unreachable
+            errorMessage = "No network connection"
+            return
+        }
+
         do {
             let result = try await service.fetchStatusPage(connection: connection)
             let allMonitors = result.groups.flatMap(\.monitors)
@@ -67,6 +80,10 @@ final class MenuBarViewModel {
             lastCheckTime = Date()
             hasActiveIncident = downCount > 0
             errorMessage = nil
+
+            if settingsStore.notificationsEnabled {
+                detectStateTransitions(monitors: allMonitors, serverName: connection.name)
+            }
 
             if downCount > 0 {
                 overallStatus = .someDown(count: downCount, total: totalCount)
@@ -81,6 +98,29 @@ final class MenuBarViewModel {
             errorMessage = error.localizedDescription
             overallStatus = .unreachable
             pollingEngine.reportFailure()
+        }
+    }
+
+    private func detectStateTransitions(monitors: [UnifiedMonitor], serverName: String) {
+        let notifications = NotificationManager.shared
+
+        for monitor in monitors {
+            let previousStatus = previousMonitorStatuses[monitor.id]
+
+            if previousStatus == .up && monitor.currentStatus == .down {
+                monitorDownSince[monitor.id] = Date()
+                notifications.sendDownAlert(monitorName: monitor.name, serverName: serverName)
+            } else if previousStatus == .down && monitor.currentStatus == .up {
+                let downDuration = monitorDownSince[monitor.id].map { Date().timeIntervalSince($0) }
+                monitorDownSince.removeValue(forKey: monitor.id)
+                notifications.sendRecoveryAlert(
+                    monitorName: monitor.name,
+                    serverName: serverName,
+                    downDuration: downDuration
+                )
+            }
+
+            previousMonitorStatuses[monitor.id] = monitor.currentStatus
         }
     }
 

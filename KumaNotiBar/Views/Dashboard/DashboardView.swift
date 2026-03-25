@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct DashboardView: View {
-    let menuBarVM: MenuBarViewModel
-    let dashboardVM: DashboardViewModel
+    @Bindable var menuBarVM: MenuBarViewModel
+    @Bindable var dashboardVM: DashboardViewModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -10,6 +10,14 @@ struct DashboardView: View {
                 summary: dashboardVM.summaryText,
                 latency: dashboardVM.serverLatency,
                 overallStatus: menuBarVM.overallStatus
+            )
+
+            Divider()
+
+            FilterBarView(
+                statusFilter: $dashboardVM.statusFilter,
+                searchText: $dashboardVM.searchText,
+                uptimePeriod: $dashboardVM.uptimePeriod
             )
 
             Divider()
@@ -32,6 +40,7 @@ struct DashboardView: View {
                         MonitorGroupSection(
                             group: group,
                             heartbeats: dashboardVM.heartbeats,
+                            uptimePeriod: dashboardVM.uptimePeriod,
                             onMonitorTap: nil
                         )
                     }

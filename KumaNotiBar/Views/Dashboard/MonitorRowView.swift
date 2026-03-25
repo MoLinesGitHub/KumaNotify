@@ -3,6 +3,7 @@ import SwiftUI
 struct MonitorRowView: View {
     let monitor: UnifiedMonitor
     let heartbeats: [UnifiedHeartbeat]?
+    var uptimePeriod: UptimePeriod = .twentyFourHours
 
     var body: some View {
         HStack(spacing: 8) {
@@ -13,25 +14,17 @@ struct MonitorRowView: View {
                     .font(.system(.body, weight: .medium))
                     .lineLimit(1)
 
-                HStack(spacing: 8) {
+                HStack(spacing: 4) {
                     if let ping = monitor.latestPing {
                         Text("\(ping)ms")
-                            .font(.caption)
+                            .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                     if let uptime = monitor.uptime24h {
-                        Text(String(format: "%.1f%%", uptime * 100))
-                            .font(.caption)
-                            .foregroundStyle(uptime >= 0.99 ? .green : .yellow)
+                        UptimeBadge(percentage: uptime, period: uptimePeriod)
                     }
-                    if let days = monitor.certExpiryDays, days < 30 {
-                        HStack(spacing: 2) {
-                            Image(systemName: "lock.shield")
-                                .font(.caption2)
-                            Text("\(days)d")
-                                .font(.caption)
-                        }
-                        .foregroundStyle(days < 7 ? .red : .yellow)
+                    if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
+                        CertExpiryBadge(daysRemaining: days)
                     }
                 }
             }

@@ -13,6 +13,7 @@ final class DashboardViewModel {
     var maintenances: [UKMaintenance] = []
     var statusFilter: MonitorStatus?
     var searchText = ""
+    var uptimePeriod: UptimePeriod = .twentyFourHours
     var isLoading = false
     var errorMessage: String?
 
@@ -102,7 +103,6 @@ final class DashboardViewModel {
     }
 
     func copySummary() {
-        let allMonitors = groups.flatMap(\.monitors)
         var text = "Status: \(summaryText)\n\n"
         for group in groups {
             text += "[\(group.name)]\n"

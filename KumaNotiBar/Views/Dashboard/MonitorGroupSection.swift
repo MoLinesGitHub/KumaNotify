@@ -3,6 +3,7 @@ import SwiftUI
 struct MonitorGroupSection: View {
     let group: UnifiedGroup
     let heartbeats: [String: [UnifiedHeartbeat]]
+    var uptimePeriod: UptimePeriod = .twentyFourHours
     let onMonitorTap: ((UnifiedMonitor) -> Void)?
 
     var body: some View {
@@ -10,7 +11,8 @@ struct MonitorGroupSection: View {
             ForEach(group.monitors, id: \.id) { monitor in
                 MonitorRowView(
                     monitor: monitor,
-                    heartbeats: heartbeats[monitor.id]
+                    heartbeats: heartbeats[monitor.id],
+                    uptimePeriod: uptimePeriod
                 )
                 .onTapGesture {
                     onMonitorTap?(monitor)
