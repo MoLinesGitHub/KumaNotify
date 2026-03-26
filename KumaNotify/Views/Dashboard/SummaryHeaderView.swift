@@ -7,44 +7,59 @@ struct SummaryHeaderView: View {
     var lastIncidentDate: Date?
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack {
-                Image(systemName: overallStatus.sfSymbol)
-                    .foregroundStyle(overallStatus.color)
-                    .font(.title3)
-                    .accessibilityHidden(true)
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(overallStatus.color.opacity(0.15))
+                        .frame(width: 40, height: 40)
+
+                    Circle()
+                        .fill(overallStatus.color.opacity(0.3))
+                        .frame(width: 26, height: 26)
+
+                    Image(systemName: overallStatus.sfSymbol)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(overallStatus.color)
+                }
+                .accessibilityHidden(true)
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(overallStatus.label)
-                        .font(.headline)
+                        .font(.system(.subheadline, design: .rounded, weight: .bold))
                     Text(summary)
-                        .font(.caption)
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+
                 Spacer()
-                VStack(alignment: .trailing, spacing: 1) {
-                    if let latency {
-                        Text(String(format: String(localized: "%@ms"), "\(latency)"))
-                            .font(.caption.monospacedDigit())
+
+                if let latency {
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text("\(latency)")
+                            .font(.system(.title3, design: .rounded, weight: .bold).monospacedDigit())
+                            .foregroundStyle(overallStatus.color)
+                        Text("ms avg")
+                            .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(.secondary)
-                        Text(String(localized: "avg"))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
                     }
                 }
             }
+
             if let lastIncidentDate {
                 HStack(spacing: 4) {
                     Image(systemName: "shield.checkered")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                     Text(String(format: String(localized: "Last incident %@"), lastIncidentDate.formatted(.relative(presentation: .named))))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
                     Spacer()
                 }
             }
         }
-        .padding(12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 }

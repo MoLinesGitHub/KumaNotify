@@ -36,8 +36,8 @@ struct DashboardView: View {
                 mainContent
             }
         }
-        .frame(width: 340)
-        .frame(minHeight: 300, maxHeight: 500)
+        .frame(width: 380)
+        .frame(minHeight: 400, maxHeight: 700)
         .task {
             await dashboardVM.fetchData()
         }
@@ -90,7 +90,7 @@ struct DashboardView: View {
             }
 
             ScrollView {
-                LazyVStack(spacing: 8, pinnedViews: .sectionHeaders) {
+                LazyVStack(spacing: 12, pinnedViews: .sectionHeaders) {
                     ForEach(dashboardVM.filteredGroups, id: \.id) { group in
                         MonitorGroupSection(
                             group: group,
@@ -177,40 +177,33 @@ struct DashboardView: View {
 
     // MARK: - Bottom Toolbar
 
+    private func toolbarIcon(_ systemName: String, label: String, action: @escaping () -> Void) -> some View {
+        ToolbarButton(systemName: systemName, action: action)
+            .accessibilityLabel(label)
+    }
+
     private var bottomToolbar: some View {
         HStack(spacing: 12) {
-            Button {
+            toolbarIcon("arrow.clockwise", label: String(localized: "Refresh")) {
                 Task {
                     await dashboardVM.refresh()
                     await menuBarVM.refresh()
                 }
-            } label: {
-                Image(systemName: "arrow.clockwise")
             }
-            .buttonStyle(.plain)
-            .disabled(menuBarVM.pollingEngine.isPolling)
-            .accessibilityLabel(String(localized: "Refresh"))
+            .opacity(menuBarVM.pollingEngine.isPolling ? 0.3 : 1)
 
-            Button {
+            toolbarIcon("clock.arrow.circlepath", label: String(localized: "Incident History")) {
                 if isPro {
                     dashboardVM.loadIncidentHistory()
                     dashboardVM.showIncidentHistory = true
                 } else {
                     showPaywall = true
                 }
-            } label: {
-                Image(systemName: "clock.arrow.circlepath")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "Incident History"))
 
-            Button {
+            toolbarIcon("doc.on.doc", label: String(localized: "Copy Summary")) {
                 dashboardVM.copySummary()
-            } label: {
-                Image(systemName: "doc.on.doc")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "Copy Summary"))
 
             Spacer()
 
@@ -244,8 +237,10 @@ struct DashboardView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
+                    .font(.body)
+                    .frame(width: 28, height: 28)
             }
-            .buttonStyle(.plain)
+            .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .accessibilityLabel(String(localized: "More Options"))
         }

@@ -12,6 +12,9 @@ struct MonitorRowView: View {
     var onToggleHidden: (() -> Void)?
     var onToggleAcknowledge: (() -> Void)?
 
+    private static let bubbleSize: CGFloat = 82
+    @State private var isHovered = false
+
     private var accessibilityDescription: String {
         var parts = [monitor.name, monitor.currentStatus.label]
         if let ping = monitor.latestPing {
@@ -36,53 +39,77 @@ struct MonitorRowView: View {
         }
     }
 
-    var body: some View {
-        HStack(spacing: 8) {
-            StatusDot(status: monitor.currentStatus, animated: monitor.currentStatus == .down)
+    private var statusColor: Color { monitor.currentStatus.color }
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
+    private var shortName: String {
+        monitor.name
+            .replacingOccurrences(of: "EXT - ", with: "")
+            .replacingOccurrences(of: "INT - ", with: "")
+    }
+
+    var body: some View {
+        VStack(spacing: 3) {
+            ZStack {
+                // Outer glow ring
+                Circle()
+                    .fill(statusColor.opacity(0.08))
+                    .frame(width: Self.bubbleSize + 6, height: Self.bubbleSize + 6)
+
+                // Filled bubble with status color
+                Circle()
+                    .fill(statusColor.opacity(0.6))
+                    .frame(width: Self.bubbleSize, height: Self.bubbleSize)
+
+                // Inner ring
+                Circle()
+                    .strokeBorder(statusColor.opacity(0.6), lineWidth: 2)
+                    .frame(width: Self.bubbleSize, height: Self.bubbleSize)
+
+                // Highlight arc (glass refraction)
+                Circle()
+                    .trim(from: 0.0, to: 0.3)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.white.opacity(0.25), .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        lineWidth: 1
+                    )
+                    .frame(width: Self.bubbleSize - 4, height: Self.bubbleSize - 4)
+                    .rotationEffect(.degrees(-60))
+
+                // Content
+                VStack(spacing: 1) {
                     if isPinned {
                         Image(systemName: "pin.fill")
-                            .font(.system(size: 8))
+                            .font(.system(size: 7))
                             .foregroundStyle(.orange)
                     }
-                    Text(monitor.name)
-                        .font(.system(.body, weight: .medium))
-                        .lineLimit(1)
-                }
 
-                HStack(spacing: 4) {
+                    Text(shortName)
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .lineLimit(3)
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.65)
+                        .padding(.horizontal, 8)
+
                     if let ping = monitor.latestPing {
-                        Text(String(format: String(localized: "%@ms"), "\(ping)"))
-                            .font(.caption2.monospacedDigit())
+                        Text("\(ping)ms")
+                            .font(.system(size: 8, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
-                    if showProFeatures, let uptime = uptimeForPeriod {
-                        UptimeBadge(percentage: uptime, period: uptimePeriod)
-                    }
-                    if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
-                        CertExpiryBadge(daysRemaining: days)
-                    }
                 }
             }
-
-            Spacer()
-
-            if showProFeatures, let beats = heartbeats, beats.count >= 2 {
-                SparklineView(
-                    dataPoints: beats.compactMap(\.ping).suffix(20).map { $0 },
-                    color: monitor.currentStatus.color
-                )
-                .frame(width: 50, height: 18)
-            }
+            .shadow(color: statusColor.opacity(monitor.currentStatus == .down ? 0.5 : 0.2), radius: monitor.currentStatus == .down ? 8 : 3)
+            .scaleEffect(isHovered ? 1.08 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: isHovered)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .contentShape(Rectangle())
-        .opacity(isHidden ? 0.5 : 1.0)
+        .opacity(isHidden ? 0.35 : 1.0)
+        .onHover { isHovered = $0 }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityDescription)
+        .contentShape(Circle())
         .contextMenu {
             Button {
                 onTogglePin?()

@@ -13,41 +13,64 @@ struct MonitorGroupSection: View {
     var onToggleHidden: ((UnifiedMonitor) -> Void)?
     var onToggleAcknowledge: ((UnifiedMonitor) -> Void)?
 
+    private let columns = [
+        GridItem(.adaptive(minimum: 88, maximum: 100), spacing: 6)
+    ]
+
     var body: some View {
         Section {
-            ForEach(group.monitors, id: \.id) { monitor in
-                MonitorRowView(
-                    monitor: monitor,
-                    heartbeats: heartbeats[monitor.id],
-                    uptimePeriod: uptimePeriod,
-                    isPinned: prefFor(monitor)?.isPinned ?? false,
-                    isHidden: prefFor(monitor)?.isHidden ?? false,
-                    showProFeatures: showProFeatures,
-                    isAcknowledged: connectionId.map { acknowledgedMonitors.contains("\($0):\(monitor.id)") } ?? false,
-                    onTogglePin: { onTogglePin?(monitor) },
-                    onToggleHidden: { onToggleHidden?(monitor) },
-                    onToggleAcknowledge: { onToggleAcknowledge?(monitor) }
-                )
-                .onTapGesture {
-                    onMonitorTap?(monitor)
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(group.monitors, id: \.id) { monitor in
+                    MonitorRowView(
+                        monitor: monitor,
+                        heartbeats: heartbeats[monitor.id],
+                        uptimePeriod: uptimePeriod,
+                        isPinned: prefFor(monitor)?.isPinned ?? false,
+                        isHidden: prefFor(monitor)?.isHidden ?? false,
+                        showProFeatures: showProFeatures,
+                        isAcknowledged: connectionId.map { acknowledgedMonitors.contains("\($0):\(monitor.id)") } ?? false,
+                        onTogglePin: { onTogglePin?(monitor) },
+                        onToggleHidden: { onToggleHidden?(monitor) },
+                        onToggleAcknowledge: { onToggleAcknowledge?(monitor) }
+                    )
+                    .onTapGesture {
+                        onMonitorTap?(monitor)
+                    }
                 }
             }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 6)
         } header: {
-            HStack {
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(sectionColor)
+                    .frame(width: 3, height: 12)
+
                 Text(group.name)
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
+                    .tracking(1.2)
+
                 Spacer()
+
                 let up = group.monitors.filter { $0.currentStatus == .up }.count
                 Text("\(up)/\(group.monitors.count)")
-                    .font(.caption2.monospacedDigit())
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.background)
         }
+    }
+
+    private var sectionColor: Color {
+        let allUp = group.monitors.allSatisfy { $0.currentStatus == .up }
+        let anyDown = group.monitors.contains { $0.currentStatus == .down }
+        if anyDown { return .red }
+        if allUp { return .green }
+        return .yellow
     }
 
     private func prefFor(_ monitor: UnifiedMonitor) -> MonitorPreference? {
