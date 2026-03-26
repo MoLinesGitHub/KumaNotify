@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import os
 
 @main
 struct KumaNotifyApp: App {
@@ -66,27 +67,30 @@ struct KumaNotifyApp: App {
 
     init() {
         let store = SettingsStore()
+        let engine = PollingEngine()
         _settingsStore = State(initialValue: store)
-        _pollingEngine = State(initialValue: PollingEngine())
+        _pollingEngine = State(initialValue: engine)
 
-        let pm = try? PersistenceManager()
-        _persistence = State(initialValue: pm)
-        pm?.purgeOldIncidents()
+        do {
+            let pm = try PersistenceManager()
+            _persistence = State(initialValue: pm)
+        } catch {
+            Logger.app.error("PersistenceManager failed to initialize: \(error.localizedDescription)")
+            _persistence = State(initialValue: nil)
+        }
 
-        if store.serverConnection != nil {
-            let service = MonitoringServiceFactory.create(for: store.serverConnection!.provider)
-            let engine = PollingEngine()
-            _pollingEngine = State(initialValue: engine)
+        if let connection = store.serverConnection {
+            let service = MonitoringServiceFactory.create(for: connection.provider)
             _menuBarVM = State(initialValue: MenuBarViewModel(
                 service: service,
                 settingsStore: store,
                 pollingEngine: engine,
-                persistence: pm
+                persistence: _persistence.wrappedValue
             ))
             _dashboardVM = State(initialValue: DashboardViewModel(
                 service: service,
                 settingsStore: store,
-                persistence: pm
+                persistence: _persistence.wrappedValue
             ))
         } else {
             _showOnboarding = State(initialValue: !store.hasCompletedOnboarding)
@@ -111,6 +115,8 @@ struct KumaNotifyApp: App {
 
         menuBarVM = mbVM
         dashboardVM = dbVM
+
+        persistence?.purgeOldIncidents()
 
         Task {
             _ = await NotificationManager.shared.requestPermission()

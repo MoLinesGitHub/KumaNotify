@@ -19,6 +19,10 @@ xcodebuild test \
 
 The `.xcodeproj` is gitignored. Always regenerate from `project.yml` after structural changes.
 
+## Context
+
+Uptime Kuma runs as a Docker container on a Synology NAS (local network). The NAS volume is mounted at `/Volumes/molines-designs/uptime-kuma`. This macOS app is a native menu bar client to monitor the status pages exposed by that instance. On macOS there is an existing third-party app for viewing Kuma; this project aims to also bring native monitoring to iOS/watchOS.
+
 ## Architecture
 
 macOS menu bar monitoring app. Swift 6, SwiftUI, macOS 14+, MVVM with `@Observable`.

@@ -34,7 +34,8 @@ enum OverallStatus: Sendable {
         switch self {
         case .allUp: String(localized: "All systems operational")
         case .degraded: String(localized: "Degraded performance")
-        case .someDown(let count, _): String(localized: "\(count) monitors down")
+        case .someDown(let count, _):
+            String.localizedStringWithFormat(String(localized: "%lld monitors down"), count)
         case .unreachable: String(localized: "Server unreachable")
         }
     }

@@ -7,13 +7,9 @@ final class IncidentRecord {
     var monitorName: String
     var serverConnectionId: UUID
     var serverName: String
-    var transitionType: String
+    var transitionType: IncidentTransitionType
     var timestamp: Date
     var downDuration: TimeInterval?
-
-    var transition: IncidentTransitionType {
-        IncidentTransitionType(rawValue: transitionType) ?? .wentDown
-    }
 
     init(
         monitorId: String,
@@ -28,8 +24,9 @@ final class IncidentRecord {
         self.monitorName = monitorName
         self.serverConnectionId = serverConnectionId
         self.serverName = serverName
-        self.transitionType = transitionType.rawValue
+        self.transitionType = transitionType
         self.timestamp = timestamp
-        self.downDuration = downDuration
+        // downDuration only meaningful for recovery events
+        self.downDuration = transitionType == .recovered ? downDuration : nil
     }
 }

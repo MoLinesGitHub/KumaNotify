@@ -6,7 +6,7 @@ struct IncidentHistoryView: View {
 
     private var groupedByDate: [(key: String, incidents: [IncidentRecord])] {
         let calendar = Calendar.current
-        let grouped = Dictionary(grouping: incidents) { incident -> String in
+        func dateKey(for incident: IncidentRecord) -> String {
             if calendar.isDateInToday(incident.timestamp) {
                 return String(localized: "Today")
             } else if calendar.isDateInYesterday(incident.timestamp) {
@@ -15,20 +15,13 @@ struct IncidentHistoryView: View {
                 return incident.timestamp.formatted(.dateTime.month(.abbreviated).day())
             }
         }
-        let ordered = incidents.map { incident -> String in
-            if calendar.isDateInToday(incident.timestamp) {
-                return String(localized: "Today")
-            } else if calendar.isDateInYesterday(incident.timestamp) {
-                return String(localized: "Yesterday")
-            } else {
-                return incident.timestamp.formatted(.dateTime.month(.abbreviated).day())
-            }
-        }
+        let keyed = incidents.map { (key: dateKey(for: $0), incident: $0) }
         var seen = Set<String>()
-        let uniqueOrder = ordered.filter { seen.insert($0).inserted }
-        return uniqueOrder.compactMap { key in
-            guard let items = grouped[key] else { return nil }
-            return (key: key, incidents: items)
+        let uniqueOrder = keyed.compactMap { seen.insert($0.key).inserted ? $0.key : nil }
+        let grouped = Dictionary(grouping: keyed, by: \.key)
+        return uniqueOrder.compactMap { k in
+            guard let items = grouped[k] else { return nil }
+            return (key: k, incidents: items.map(\.incident))
         }
     }
 

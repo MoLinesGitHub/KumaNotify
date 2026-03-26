@@ -3,14 +3,10 @@ import SwiftUI
 struct IncidentRowView: View {
     let incident: IncidentRecord
 
-    private var transitionType: IncidentTransitionType {
-        incident.transition
-    }
-
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: transitionType.sfSymbol)
-                .foregroundStyle(transitionType.color)
+            Image(systemName: incident.transitionType.sfSymbol)
+                .foregroundStyle(incident.transitionType.color)
                 .font(.caption)
                 .frame(width: 16)
 
@@ -18,7 +14,7 @@ struct IncidentRowView: View {
                 Text(incident.monitorName)
                     .font(.system(.caption, weight: .medium))
                     .lineLimit(1)
-                Text(transitionType.label)
+                Text(incident.transitionType.label)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -30,7 +26,7 @@ struct IncidentRowView: View {
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
                 if let duration = incident.downDuration {
-                    Text(Self.formattedDuration(duration))
+                    Text(Self.durationFormatter.string(from: duration) ?? "")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.tertiary)
                 }
@@ -40,11 +36,11 @@ struct IncidentRowView: View {
         .padding(.horizontal, 8)
     }
 
-    static func formattedDuration(_ duration: TimeInterval) -> String {
-        let formatter = DateComponentsFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.allowedUnits = [.hour, .minute, .second]
-        formatter.maximumUnitCount = 2
-        return formatter.string(from: duration) ?? ""
-    }
+    private static let durationFormatter: DateComponentsFormatter = {
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .abbreviated
+        f.allowedUnits = [.hour, .minute, .second]
+        f.maximumUnitCount = 2
+        return f
+    }()
 }

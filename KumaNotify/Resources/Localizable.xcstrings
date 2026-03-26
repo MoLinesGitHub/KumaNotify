@@ -261,6 +261,16 @@
         }
       }
     },
+    "never" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nunca"
+          }
+        }
+      }
+    },
     "Next" : {
       "localizations" : {
         "es" : {
