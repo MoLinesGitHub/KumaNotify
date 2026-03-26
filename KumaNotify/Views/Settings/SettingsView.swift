@@ -173,7 +173,7 @@ struct SettingsView: View {
                         .frame(width: 40)
                 }
                 if !isPro {
-                    Text("Pro unlocks polling from \(Int(AppConstants.minimumPollingPro))s")
+                    Text(String(format: String(localized: "Pro unlocks polling from %@s"), "\(Int(AppConstants.minimumPollingPro))"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

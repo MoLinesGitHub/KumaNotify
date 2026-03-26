@@ -89,7 +89,7 @@ struct OnboardingView: View {
             if let result = testResult {
                 switch result {
                 case .success(let title):
-                    Label("Connected: \(title)", systemImage: "checkmark.circle.fill")
+                    Label(String(format: String(localized: "Connected: %@"), title), systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .font(.caption)
                 case .failure(let error):

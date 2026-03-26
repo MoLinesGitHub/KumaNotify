@@ -206,8 +206,8 @@ struct DashboardView: View {
                 if isPro {
                     Toggle("Show Hidden Monitors", isOn: $dashboardVM.showHiddenMonitors)
                     Menu("Export Incidents") {
-                        Button("CSV") { exportFile(dashboardVM.exportIncidentsCSV()) }
-                        Button("JSON") { exportFile(dashboardVM.exportIncidentsJSON()) }
+                        Button(String(localized: "CSV")) { exportFile(dashboardVM.exportIncidentsCSV()) }
+                        Button(String(localized: "JSON")) { exportFile(dashboardVM.exportIncidentsJSON()) }
                     }
                     Button("Share Status...") { showShareSheet() }
                     Button("Email Report") {

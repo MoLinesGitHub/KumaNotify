@@ -38,7 +38,7 @@ struct SummaryHeaderView: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
-                    Text("Last incident \(lastIncidentDate, format: .relative(presentation: .named))")
+                    Text(String(format: String(localized: "Last incident %@"), lastIncidentDate.formatted(.relative(presentation: .named))))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Spacer()

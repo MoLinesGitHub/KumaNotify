@@ -14,13 +14,17 @@ struct MonitorRowView: View {
 
     private var accessibilityDescription: String {
         var parts = [monitor.name, monitor.currentStatus.label]
-        if let ping = monitor.latestPing { parts.append("\(ping)ms") }
-        if let uptime = uptimeForPeriod { parts.append(String(format: "%.1f%% uptime", uptime * 100)) }
-        if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
-            parts.append("cert expires in \(days) days")
+        if let ping = monitor.latestPing {
+            parts.append(String(format: String(localized: "%@ms"), "\(ping)"))
         }
-        if isPinned { parts.append("pinned") }
-        if isAcknowledged { parts.append("acknowledged") }
+        if let uptime = uptimeForPeriod {
+            parts.append(String(format: "%.1f%% \(String(localized: "Uptime"))", uptime * 100))
+        }
+        if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
+            parts.append(String(format: String(localized: "Certificate expires in %lld days"), Int64(days)))
+        }
+        if isPinned { parts.append(String(localized: "Pin to Top")) }
+        if isAcknowledged { parts.append(String(localized: "Acknowledge")) }
         return parts.joined(separator: ", ")
     }
 

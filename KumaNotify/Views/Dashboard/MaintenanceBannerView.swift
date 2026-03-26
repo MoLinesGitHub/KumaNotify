@@ -43,7 +43,7 @@ struct MaintenanceBannerView: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                     if let end = maintenance.endDate {
-                        Text("→ \(end, style: .time)")
+                        Text(String(format: String(localized: "→ %@"), end.formatted(date: .omitted, time: .shortened)))
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.tertiary)
                     }

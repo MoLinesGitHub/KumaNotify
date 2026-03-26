@@ -21,6 +21,6 @@ struct CertExpiryBadge: View {
         .background(color.opacity(0.15), in: Capsule())
         .foregroundStyle(color)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(String(localized: "Certificate expires in \(daysRemaining) days"))
+        .accessibilityLabel(String(format: String(localized: "Certificate expires in %lld days"), Int64(daysRemaining)))
     }
 }
