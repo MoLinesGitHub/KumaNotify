@@ -23,5 +23,6 @@ struct StatusDot: View {
             .onChange(of: animated) { _, newValue in
                 isPulsing = newValue
             }
+            .accessibilityLabel(status.label)
     }
 }

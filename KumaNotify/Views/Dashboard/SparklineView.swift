@@ -44,5 +44,16 @@ struct SparklineView: View {
                 context.fill(Path(ellipseIn: dot), with: .color(color))
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "Response time trend"))
+        .accessibilityValue(sparklineSummary)
+    }
+
+    private var sparklineSummary: String {
+        guard !dataPoints.isEmpty else { return "" }
+        let last = dataPoints.last ?? 0
+        let min = dataPoints.min() ?? 0
+        let max = dataPoints.max() ?? 0
+        return "\(last)ms current, \(min)ms min, \(max)ms max"
     }
 }

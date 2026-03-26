@@ -22,5 +22,7 @@ struct UptimeBadge: View {
             .padding(.vertical, 1)
             .background(color.opacity(0.15), in: Capsule())
             .foregroundStyle(color)
+            .accessibilityLabel(String(localized: "Uptime"))
+            .accessibilityValue("\(displayText) \(period.rawValue)")
     }
 }
