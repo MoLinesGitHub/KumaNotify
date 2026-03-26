@@ -6,73 +6,42 @@ import AppKit
 final class DashboardViewModel {
     private let settingsStore: SettingsStore
     private let persistence: PersistenceManager?
-    private(set) var connection: ServerConnection
+    private(set) var connection: ServerConnection {
+        didSet { recomputeFilteredGroups() }
+    }
 
-    var groups: [UnifiedGroup] = []
+    var groups: [UnifiedGroup] = [] {
+        didSet { recomputeDerivedState() }
+    }
     var heartbeats: [String: [UnifiedHeartbeat]] = [:]
     var incidents: [UKIncident] = []
     var maintenances: [UnifiedMaintenance] = []
-    var statusFilter: MonitorStatus?
-    var searchText = ""
+    var statusFilter: MonitorStatus? {
+        didSet { recomputeFilteredGroups() }
+    }
+    var searchText = "" {
+        didSet { recomputeFilteredGroups() }
+    }
     var uptimePeriod: UptimePeriod = .twentyFourHours
     var isLoading = false
     var errorMessage: String?
 
     // Phase 3: Persistence state
-    var monitorPreferences: [String: MonitorPreference] = [:]
-    var showHiddenMonitors = false
+    var monitorPreferences: [String: MonitorPreference] = [:] {
+        didSet { recomputeFilteredGroups() }
+    }
+    var showHiddenMonitors = false {
+        didSet { recomputeFilteredGroups() }
+    }
     var incidentRecords: [IncidentRecord] = []
     var showIncidentHistory = false
     var lastIncidentDate: Date?
+    private(set) var summaryText = ""
+    private(set) var serverLatency: Int?
+    private(set) var filteredGroups: [UnifiedGroup] = []
 
-    var summaryText: String {
-        let allMonitors = groups.flatMap(\.monitors)
-        let up = allMonitors.filter { $0.currentStatus == .up }.count
-        let total = allMonitors.count
-        let timeAgo = relativeTimeString
-        return String(format: String(localized: "%lld/%lld OK — %@"), Int64(up), Int64(total), timeAgo)
-    }
-
-    var serverLatency: Int? {
-        let allPings = groups.flatMap(\.monitors).compactMap(\.latestPing)
-        guard !allPings.isEmpty else { return nil }
-        return allPings.reduce(0, +) / allPings.count
-    }
-
-    private var lastFetchTime: Date?
-
-    private var relativeTimeString: String {
-        guard let lastFetchTime else { return String(localized: "never") }
-        return lastFetchTime.formatted(.relative(presentation: .numeric))
-    }
-
-    var filteredGroups: [UnifiedGroup] {
-        groups.map { group in
-            let filtered = group.monitors
-                .filter { monitor in
-                    let matchesStatus = statusFilter == nil || monitor.currentStatus == statusFilter
-                    let matchesSearch = searchText.isEmpty
-                        || monitor.name.localizedCaseInsensitiveContains(searchText)
-                    let prefKey = MonitorPreference.makeCompositeKey(monitorId: monitor.id, serverConnectionId: connection.id)
-                    let pref = monitorPreferences[prefKey]
-                    let passesHidden = showHiddenMonitors || !(pref?.isHidden ?? false)
-                    return matchesStatus && matchesSearch && passesHidden
-                }
-                .sorted { a, b in
-                    let aKey = MonitorPreference.makeCompositeKey(monitorId: a.id, serverConnectionId: connection.id)
-                    let bKey = MonitorPreference.makeCompositeKey(monitorId: b.id, serverConnectionId: connection.id)
-                    let aPinned = monitorPreferences[aKey]?.isPinned ?? false
-                    let bPinned = monitorPreferences[bKey]?.isPinned ?? false
-                    if aPinned != bPinned { return aPinned }
-                    return false
-                }
-            return UnifiedGroup(
-                id: group.id,
-                name: group.name,
-                weight: group.weight,
-                monitors: filtered
-            )
-        }.filter { !$0.monitors.isEmpty }
+    private var lastFetchTime: Date? {
+        didSet { recomputeSummary() }
     }
 
     init(
@@ -83,6 +52,7 @@ final class DashboardViewModel {
         self.connection = connection
         self.settingsStore = settingsStore
         self.persistence = persistence
+        recomputeDerivedState()
     }
 
     func fetchData() async {
@@ -270,5 +240,75 @@ final class DashboardViewModel {
         } catch {
             return nil
         }
+    }
+
+    private func recomputeDerivedState() {
+        recomputeSummary()
+        recomputeServerLatency()
+        recomputeFilteredGroups()
+    }
+
+    private func recomputeSummary() {
+        let allMonitors = groups.flatMap(\.monitors)
+        let up = allMonitors.filter { $0.currentStatus == .up }.count
+        let total = allMonitors.count
+        let timeAgo: String
+
+        if let lastFetchTime {
+            timeAgo = lastFetchTime.formatted(.relative(presentation: .numeric))
+        } else {
+            timeAgo = String(localized: "never")
+        }
+
+        summaryText = String.localizedStringWithFormat(
+            String(localized: "%lld/%lld OK — %@"),
+            Int64(up),
+            Int64(total),
+            timeAgo
+        )
+    }
+
+    private func recomputeServerLatency() {
+        let allPings = groups.flatMap(\.monitors).compactMap(\.latestPing)
+        guard !allPings.isEmpty else {
+            serverLatency = nil
+            return
+        }
+
+        serverLatency = allPings.reduce(0, +) / allPings.count
+    }
+
+    private func recomputeFilteredGroups() {
+        filteredGroups = groups.map { group in
+            let filtered = group.monitors
+                .filter { monitor in
+                    let matchesStatus = statusFilter == nil || monitor.currentStatus == statusFilter
+                    let matchesSearch = searchText.isEmpty
+                        || monitor.name.localizedCaseInsensitiveContains(searchText)
+                    let prefKey = MonitorPreference.makeCompositeKey(
+                        monitorId: monitor.id,
+                        serverConnectionId: connection.id
+                    )
+                    let pref = monitorPreferences[prefKey]
+                    let passesHidden = showHiddenMonitors || !(pref?.isHidden ?? false)
+                    return matchesStatus && matchesSearch && passesHidden
+                }
+                .sorted { a, b in
+                    let aKey = MonitorPreference.makeCompositeKey(monitorId: a.id, serverConnectionId: connection.id)
+                    let bKey = MonitorPreference.makeCompositeKey(monitorId: b.id, serverConnectionId: connection.id)
+                    let aPinned = monitorPreferences[aKey]?.isPinned ?? false
+                    let bPinned = monitorPreferences[bKey]?.isPinned ?? false
+                    if aPinned != bPinned { return aPinned }
+                    return false
+                }
+
+            return UnifiedGroup(
+                id: group.id,
+                name: group.name,
+                weight: group.weight,
+                monitors: filtered
+            )
+        }
+        .filter { !$0.monitors.isEmpty }
     }
 }

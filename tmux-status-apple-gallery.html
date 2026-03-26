@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apple Variants for Terminal Status UI</title>
+  <style>
+    :root {
+      --bg-0: #05070d;
+      --bg-1: #0b1020;
+      --bg-2: #131a2b;
+      --panel: rgba(255, 255, 255, 0.08);
+      --panel-strong: rgba(255, 255, 255, 0.13);
+      --line: rgba(255, 255, 255, 0.12);
+      --text: #f6f8ff;
+      --muted: #aab6d7;
+      --blue: #74d5ff;
+      --blue-deep: #2c6fff;
+      --lavender: #bf9dff;
+      --mint: #86ffd0;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+      --radius-xl: 32px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+      --radius-sm: 12px;
+      --mono: "MesloLGS Nerd Font Mono", "FiraCode Nerd Font Mono", "SF Mono", "Menlo", monospace;
+      --sans: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(79, 135, 255, 0.22), transparent 28%),
+        radial-gradient(circle at top right, rgba(182, 120, 255, 0.18), transparent 24%),
+        linear-gradient(180deg, #0c1120 0%, #05070d 55%, #030407 100%);
+    }
+
+    .shell {
+      width: min(1480px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 72px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04)),
+        linear-gradient(135deg, rgba(129, 194, 255, 0.12), transparent 44%),
+        rgba(14, 19, 34, 0.72);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(24px);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -35% auto;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(157, 213, 255, 0.16), transparent 62%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: #8fdfff;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 880px;
+      margin: 16px 0 10px;
+      font-size: clamp(36px, 6vw, 72px);
+      line-height: 0.94;
+      letter-spacing: -0.05em;
+    }
+
+    .hero p {
+      max-width: 820px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .meta-pill {
+      padding: 14px 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .meta-pill strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #d8e8ff;
+    }
+
+    .meta-pill span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .section {
+      margin-top: 26px;
+      padding: 24px 0 0;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 42px);
+      letter-spacing: -0.04em;
+    }
+
+    .section-copy {
+      max-width: 620px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)),
+        rgba(11, 16, 28, 0.82);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), transparent 28%);
+      pointer-events: none;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 20px 10px;
+    }
+
+    .card-head h3 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .card-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      color: #d5e6ff;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .preview {
+      padding: 0 14px 14px;
+    }
+
+    .terminal {
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.05), transparent),
+        rgba(6, 9, 16, 0.94);
+    }
+
+    .chrome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: #c9d4ef;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .traffic {
+      display: inline-flex;
+      gap: 6px;
+    }
+
+    .traffic span {
+      display: block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .traffic span:nth-child(1) { background: #ff5f57; }
+    .traffic span:nth-child(2) { background: #febc2e; }
+    .traffic span:nth-child(3) { background: #28c840; }
+
+    .bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 16px 16px 12px;
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+
+    .seg {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 0 13px;
+      border-radius: 12px;
+      white-space: nowrap;
+      color: #fff;
+      background: rgba(255,255,255,0.07);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+
+    .prompt {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px 18px;
+      font-family: var(--mono);
+      font-size: 28px;
+      color: var(--mint);
+    }
+
+    .prompt small {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .card-note {
+      padding: 0 20px 20px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .capsule-refined .terminal {
+      background:
+        radial-gradient(circle at top left, rgba(118, 204, 255, 0.08), transparent 32%),
+        linear-gradient(180deg, rgba(255,255,255,0.05), transparent),
+        #070b14;
+    }
+
+    .capsule-refined .seg {
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .capsule-refined .path { background: linear-gradient(90deg, #d8f5ff, #8fe5ff); color: #05202a; }
+    .capsule-refined .lang { background: linear-gradient(90deg, #d8b6ff, #b28cff); }
+    .capsule-refined .branch { background: linear-gradient(90deg, #8097ff, #5f74ff); }
+    .capsule-refined .meta { background: rgba(36, 48, 77, 0.96); color: #b9d4ff; }
+
+    .capsule-compact .seg {
+      min-height: 30px;
+      padding-inline: 11px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .capsule-compact .path { background: rgba(144, 233, 255, 0.16); color: #a8efff; border: 1px solid rgba(144,233,255,0.24); }
+    .capsule-compact .lang { background: rgba(194, 150, 255, 0.18); color: #e8d2ff; }
+    .capsule-compact .branch { background: rgba(125, 145, 255, 0.16); color: #d7e0ff; }
+    .capsule-compact .meta { background: transparent; color: #92b2e8; box-shadow: none; }
+
+    .capsule-luminous .terminal {
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 80px rgba(132, 168, 255, 0.12);
+    }
+
+    .capsule-luminous .seg {
+      border-radius: 999px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 8px 20px rgba(0,0,0,0.18);
+    }
+
+    .capsule-luminous .path { background: linear-gradient(90deg, #f3fbff, #bfefff); color: #143042; }
+    .capsule-luminous .lang { background: linear-gradient(90deg, #f0d8ff, #c79eff); color: #fff; }
+    .capsule-luminous .branch { background: linear-gradient(90deg, #9eadff, #6f81ff); }
+    .capsule-luminous .meta { background: linear-gradient(90deg, #1c2742, #24365e); color: #c1d9ff; }
+
+    .signal-refined .terminal {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.03), transparent),
+        repeating-linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px),
+        #03050b;
+    }
+
+    .signal-refined .path { background: #89e9ff; color: #0d2830; }
+    .signal-refined .lang { background: #d59cff; }
+    .signal-refined .branch { background: #1a2444; color: #edf2ff; }
+    .signal-refined .meta { background: #0f1731; color: #8fb8ff; }
+
+    .signal-minimal .seg {
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      box-shadow: none;
+    }
+
+    .signal-minimal .path { background: rgba(120, 222, 255, 0.12); color: #a6efff; }
+    .signal-minimal .lang { background: rgba(193, 152, 255, 0.12); color: #e8d2ff; }
+    .signal-minimal .branch { background: rgba(255,255,255,0.05); color: #dbe3fb; }
+    .signal-minimal .meta { background: transparent; color: #91afdf; border-color: transparent; }
+
+    .signal-pro .terminal {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04), transparent),
+        #050811;
+    }
+
+    .signal-pro .seg { border-radius: 9px; }
+    .signal-pro .path { background: linear-gradient(90deg, #7de2ff, #49cfff); color: #052534; }
+    .signal-pro .lang { background: linear-gradient(90deg, #cb95ff, #aa77ff); }
+    .signal-pro .branch { background: linear-gradient(90deg, #1e2849, #243562); }
+    .signal-pro .meta { background: linear-gradient(90deg, #101a33, #142042); color: #a4c7ff; }
+    .signal-pro .prompt { text-shadow: 0 0 14px rgba(134,255,208,0.34); }
+
+    .glass-refined .terminal {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.03)),
+        rgba(23, 31, 49, 0.52);
+      backdrop-filter: blur(28px);
+    }
+
+    .glass-refined .chrome { background: rgba(255,255,255,0.09); }
+    .glass-refined .seg {
+      background: rgba(255,255,255,0.12);
+      border-radius: 13px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+    }
+
+    .glass-refined .path { color: #d9f4ff; }
+    .glass-refined .lang { color: #f1ddff; }
+    .glass-refined .branch { color: #eef2ff; }
+    .glass-refined .meta { color: #c8dbff; }
+
+    .glass-light .terminal {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.08)),
+        rgba(184, 210, 255, 0.12);
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    .glass-light .chrome {
+      background: rgba(255,255,255,0.14);
+      color: #dce8ff;
+    }
+
+    .glass-light .seg {
+      background: rgba(255,255,255,0.16);
+      color: #f8fbff;
+      border-radius: 14px;
+    }
+
+    .glass-light .path { color: #eaf8ff; }
+    .glass-light .lang { color: #f5e9ff; }
+    .glass-light .branch { color: #f6f8ff; }
+    .glass-light .meta { color: #d8e3ff; }
+
+    .glass-editorial .terminal {
+      background:
+        radial-gradient(circle at top right, rgba(193, 214, 255, 0.18), transparent 30%),
+        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)),
+        rgba(20, 26, 42, 0.58);
+    }
+
+    .glass-editorial .seg {
+      border-radius: 16px;
+      background: rgba(255,255,255,0.11);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 10px 24px rgba(0,0,0,0.16);
+    }
+
+    .glass-editorial .path { color: #e0f7ff; }
+    .glass-editorial .lang { color: #f2dcff; }
+    .glass-editorial .branch { color: #eef3ff; }
+    .glass-editorial .meta { color: #c8dbff; }
+
+    @media (max-width: 760px) {
+      .shell {
+        width: min(100% - 18px, 1480px);
+        padding-top: 18px;
+      }
+
+      .hero {
+        padding: 22px;
+        border-radius: 24px;
+      }
+
+      h1 {
+        font-size: 42px;
+      }
+
+      .card {
+        border-radius: 22px;
+      }
+
+      .terminal {
+        border-radius: 18px;
+      }
+
+      .bar {
+        font-size: 13px;
+      }
+
+      .seg {
+        min-height: 30px;
+        padding-inline: 10px;
+      }
+
+      .prompt {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow">Second Gallery / Apple Direction</div>
+      <h1>Capsule Mode, Signal Ready y Glass, llevados a una dirección más Apple.</h1>
+      <p>
+        Refiné tus tres elegidos hacia un lenguaje más macOS: superficies más precisas, color más controlado,
+        contraste limpio, radios continuos y menos ruido de tema gamer. La lógica sigue siendo la de tu captura:
+        ruta, stack, rama, sesión y estado temporal.
+      </p>
+      <div class="meta-grid">
+        <div class="meta-pill"><strong>Capsule</strong><span>Más aire, mejores proporciones, chips más consistentes y lectura más táctil.</span></div>
+        <div class="meta-pill"><strong>Signal</strong><span>Textura más fina, bloques con autoridad y feeling de monitor premium.</span></div>
+        <div class="meta-pill"><strong>Glass</strong><span>Transparencia controlada y jerarquía tipo app de macOS en vez de theme improvisado.</span></div>
+        <div class="meta-pill"><strong>Dirección</strong><span>SF-like, más calma visual, paleta fría y motion implícito a través del shape.</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2 class="section-title">Capsule Family</h2>
+          <div class="section-copy">La idea original se mantiene, pero con chips mejor calibrados y una composición más ordenada. Aquí la barra se siente parte de una app cuidada, no solo de un prompt.</div>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card capsule-refined">
+          <div class="card-head">
+            <div><h3>Capsule Refined</h3><p>La versión principal. Más clara, más elegante y muy cercana a un UI kit de macOS.</p></div>
+            <span class="tag">Primary</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Status Capsule</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch"> main</span><span class="seg meta">6.3</span><span class="seg meta">default</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">❯ <small>capsule refined</small></div>
+            </div>
+          </div>
+          <div class="card-note">La ruta manda. Los secundarios quedan agrupados sin robar foco.</div>
+        </article>
+
+        <article class="card capsule-compact">
+          <div class="card-head">
+            <div><h3>Capsule Compact</h3><p>Más contenido y sobrio. Mejor si quieres que la barra no domine todo el layout.</p></div>
+            <span class="tag">Compact</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Compact Capsule</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch">main</span><span class="seg meta">6.3</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">› <small>compact</small></div>
+            </div>
+          </div>
+          <div class="card-note">Reduce masa visual sin perder la familia estética.</div>
+        </article>
+
+        <article class="card capsule-luminous">
+          <div class="card-head">
+            <div><h3>Capsule Luminous</h3><p>Una lectura más premium y brillante, útil para setups donde sí quieres algo de presencia.</p></div>
+            <span class="tag">Luminous</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Luminous Capsule</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch"> main</span><span class="seg meta">6.3</span><span class="seg meta">🐳</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">❯ <small>soft glow</small></div>
+            </div>
+          </div>
+          <div class="card-note">Más brillo, pero todavía limpio y controlado.</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2 class="section-title">Signal Family</h2>
+          <div class="section-copy">Aquí refiné el carácter técnico del estilo Signal Ready, pero quitándole agresividad visual. La textura sigue, aunque mejor integrada y con menos ruido.</div>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card signal-refined">
+          <div class="card-head">
+            <div><h3>Signal Ready Pro</h3><p>La versión más equilibrada de la familia. Sigue teniendo carácter de monitor, pero se siente de producto.</p></div>
+            <span class="tag">Primary</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Signal Ready</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch"> main</span><span class="seg meta">6.3</span><span class="seg meta">default</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">❯ <small>signal ready</small></div>
+            </div>
+          </div>
+          <div class="card-note">Textura sutil, contraste alto y bloques con buena autoridad.</div>
+        </article>
+
+        <article class="card signal-minimal">
+          <div class="card-head">
+            <div><h3>Signal Minimal</h3><p>La misma estructura, pero bajando el volumen visual y priorizando la legibilidad cotidiana.</p></div>
+            <span class="tag">Minimal</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Signal Minimal</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch">main</span><span class="seg meta">6.3</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">› <small>quiet signal</small></div>
+            </div>
+          </div>
+          <div class="card-note">Mejor candidata si abres muchas ventanas y no quieres fatiga visual.</div>
+        </article>
+
+        <article class="card signal-pro">
+          <div class="card-head">
+            <div><h3>Signal Studio</h3><p>Empuja más el acabado hi-fi sin irse a lo cyberpunk. Ideal para una barra protagonista.</p></div>
+            <span class="tag">Studio</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Signal Studio</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch"> main</span><span class="seg meta">6.3</span><span class="seg meta">🐳</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">❯ <small>signal studio</small></div>
+            </div>
+          </div>
+          <div class="card-note">Más teatral, pero todavía dentro de una disciplina Apple-like.</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2 class="section-title">Glass Family</h2>
+          <div class="section-copy">Esta familia está pensada para verse como parte de una app nativa. Menos efecto por efecto y más precisión en material, capas y separación.</div>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card glass-refined">
+          <div class="card-head">
+            <div><h3>Glass Refined</h3><p>La base recomendada. Transparencia moderada, buen contraste y una composición muy macOS.</p></div>
+            <span class="tag">Primary</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Glass Refined</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch">main</span><span class="seg meta">6.3</span><span class="seg meta">default</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">❯ <small>glass refined</small></div>
+            </div>
+          </div>
+          <div class="card-note">Se siente como una superficie nativa, no como un theme transparente más.</div>
+        </article>
+
+        <article class="card glass-light">
+          <div class="card-head">
+            <div><h3>Glass Light</h3><p>Sube la luz del material. Pensado para un look más etéreo y más limpio sobre fondos oscuros.</p></div>
+            <span class="tag">Light</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Glass Light</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch">main</span><span class="seg meta">6.3</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">› <small>light glass</small></div>
+            </div>
+          </div>
+          <div class="card-note">Más cristal y menos bloque. Muy buena opción si el fondo general ya es rico.</div>
+        </article>
+
+        <article class="card glass-editorial">
+          <div class="card-head">
+            <div><h3>Glass Editorial</h3><p>La versión más sofisticada. Un poco más moda, un poco más app de diseño.</p></div>
+            <span class="tag">Editorial</span>
+          </div>
+          <div class="preview">
+            <div class="terminal">
+              <div class="chrome"><span class="traffic"><span></span><span></span><span></span></span><span>Glass Editorial</span></div>
+              <div class="bar"><span class="seg path"> /Volumes/SSD/xCode_Projects/Kuma</span><span class="seg lang">Swift</span><span class="seg branch"> main</span><span class="seg meta">6.3</span><span class="seg meta">🐳</span><span class="seg meta">20:27</span></div>
+              <div class="prompt">❯ <small>editorial glass</small></div>
+            </div>
+          </div>
+          <div class="card-note">Para cuando quieres una barra claramente premium y con más firma visual.</div>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -3,6 +3,7 @@ import Foundation
 enum AppConstants {
     static let appGroupId = "group.com.molinesdesigns.kuma-notify"
     static let proProductId = "com.molinesdesigns.kumanotify.pro"
+    static let widgetKind = "com.molinesdesigns.kumanotify.widget"
     static let defaultPollingInterval: TimeInterval = 60
     static let minimumPollingBasic: TimeInterval = 60
     static let minimumPollingPro: TimeInterval = 10

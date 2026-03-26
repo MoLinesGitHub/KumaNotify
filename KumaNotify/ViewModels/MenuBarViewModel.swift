@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 @Observable
 @MainActor
@@ -9,6 +10,8 @@ final class MenuBarViewModel {
     private let persistence: PersistenceManager?
     private let storeManager: StoreManager?
     private let powerMonitor: PowerMonitor
+    private let widgetDefaults: UserDefaults?
+    private let reloadWidgets: () -> Void
 
     var overallStatus: OverallStatus = .unreachable
     var upCount = 0
@@ -41,7 +44,12 @@ final class MenuBarViewModel {
         networkMonitor: NetworkMonitor = NetworkMonitor(),
         persistence: PersistenceManager? = nil,
         storeManager: StoreManager? = nil,
-        powerMonitor: PowerMonitor = PowerMonitor()
+        powerMonitor: PowerMonitor = PowerMonitor(),
+        widgetDefaults: UserDefaults? = UserDefaults(suiteName: AppConstants.appGroupId),
+        reloadWidgets: @escaping () -> Void = {
+            WidgetCenter.shared.reloadTimelines(ofKind: AppConstants.widgetKind)
+        },
+        shouldStartMonitors: Bool = true
     ) {
         self.settingsStore = settingsStore
         self.pollingEngine = pollingEngine
@@ -49,8 +57,12 @@ final class MenuBarViewModel {
         self.persistence = persistence
         self.storeManager = storeManager
         self.powerMonitor = powerMonitor
-        self.networkMonitor.start()
-        self.powerMonitor.start()
+        self.widgetDefaults = widgetDefaults
+        self.reloadWidgets = reloadWidgets
+        if shouldStartMonitors {
+            self.networkMonitor.start()
+            self.powerMonitor.start()
+        }
     }
 
     func startPolling() {
@@ -87,7 +99,13 @@ final class MenuBarViewModel {
     private func fetchAllServers() async {
         guard networkMonitor.isConnected else {
             overallStatus = .unreachable
+            upCount = 0
+            totalCount = 0
+            lastCheckTime = Date()
+            hasActiveIncident = false
             errorMessage = String(localized: "No network connection")
+            publishWidgetData(downCount: 0)
+            refreshPollingInterval()
             return
         }
 
@@ -162,8 +180,9 @@ final class MenuBarViewModel {
             serverName: settingsStore.serverConnection?.name,
             hasActiveIncident: hasActiveIncident
         )
-        if let defaults = UserDefaults(suiteName: AppConstants.appGroupId) {
+        if let defaults = widgetDefaults {
             data.write(to: defaults)
+            reloadWidgets()
         }
     }
 

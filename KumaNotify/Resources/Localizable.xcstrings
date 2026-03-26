@@ -178,6 +178,16 @@
         }
       }
     },
+    "%lld up, %lld down, %lld total" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld activos, %2$lld caídos, %3$lld total"
+          }
+        }
+      }
+    },
     "→ %@" : {
       "comment" : "A label that shows the end time of a maintenance window. The argument is the formatted end time.",
       "extractionState" : "stale",
@@ -965,6 +975,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sin conexión de red"
+          }
+        }
+      }
+    },
+    "No data" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin datos"
           }
         }
       }
