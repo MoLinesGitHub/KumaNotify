@@ -1,17 +1,19 @@
-name: Kuma NotiBar
+name: Kuma Notify
 options:
   bundleIdPrefix: com.molinesdesigns
   deploymentTarget:
     macOS: "14.0"
-  xcodeVersion: "16.0"
+  xcodeVersion: "26.4"
   generateEmptyDirectories: true
   groupSortPosition: top
   createIntermediateGroups: true
   defaultConfig: Release
+  knownRegions: [en, es]
+  developmentLanguage: en
 
 settings:
   base:
-    SWIFT_VERSION: "6.0"
+    SWIFT_VERSION: "6.3"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     SWIFT_STRICT_CONCURRENCY: complete
@@ -28,23 +30,24 @@ configs:
   Release: release
 
 targets:
-  KumaNotiBar:
+  KumaNotify:
     type: application
     platform: macOS
     sources:
-      - path: KumaNotiBar
-      - path: KumaNotiBarShared
+      - path: KumaNotify
+      - path: KumaNotifyShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notibar
-        PRODUCT_NAME: Kuma NotiBar
-        INFOPLIST_FILE: KumaNotiBar/Info.plist
-        CODE_SIGN_ENTITLEMENTS: KumaNotiBar/Entitlements/KumaNotiBar.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify
+        PRODUCT_NAME: Kuma Notify
+        PRODUCT_MODULE_NAME: KumaNotify
+        INFOPLIST_FILE: KumaNotify/Info.plist
+        CODE_SIGN_ENTITLEMENTS: KumaNotify/Entitlements/KumaNotify.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
-      path: KumaNotiBar/Info.plist
+      path: KumaNotify/Info.plist
       properties:
-        CFBundleDisplayName: Kuma NotiBar
+        CFBundleDisplayName: Kuma Notify
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
         LSUIElement: true
@@ -52,23 +55,26 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
     entitlements:
-      path: KumaNotiBar/Entitlements/KumaNotiBar.entitlements
+      path: KumaNotify/Entitlements/KumaNotify.entitlements
       properties:
         com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
         com.apple.security.application-groups:
-          - group.com.molinesdesigns.kuma-notibar
+          - group.com.molinesdesigns.kuma-notify
     scheme:
       testTargets:
-        - KumaNotiBarTests
+        - KumaNotifyTests
 
-  KumaNotiBarTests:
+  KumaNotifyTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: KumaNotiBarTests
+      - path: KumaNotifyTests
     dependencies:
-      - target: KumaNotiBar
+      - target: KumaNotify
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notibar.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Kuma Notify.app/Contents/MacOS/Kuma Notify"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: YES

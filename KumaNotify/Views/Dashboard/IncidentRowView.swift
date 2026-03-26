@@ -1,0 +1,50 @@
+import SwiftUI
+
+struct IncidentRowView: View {
+    let incident: IncidentRecord
+
+    private var transitionType: IncidentTransitionType {
+        incident.transition
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: transitionType.sfSymbol)
+                .foregroundStyle(transitionType.color)
+                .font(.caption)
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(incident.monitorName)
+                    .font(.system(.caption, weight: .medium))
+                    .lineLimit(1)
+                Text(transitionType.label)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(incident.timestamp, style: .time)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                if let duration = incident.downDuration {
+                    Text(Self.formattedDuration(duration))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+    }
+
+    static func formattedDuration(_ duration: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .abbreviated
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.maximumUnitCount = 2
+        return formatter.string(from: duration) ?? ""
+    }
+}

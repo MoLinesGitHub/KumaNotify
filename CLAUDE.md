@@ -7,13 +7,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 xcodegen generate                    # Regenerate .xcodeproj from project.yml (REQUIRED after adding/removing files)
 xcodebuild build \
-  -project "Kuma NotiBar.xcodeproj" \
-  -scheme KumaNotiBar \
+  -project "Kuma Notify.xcodeproj" \
+  -scheme KumaNotify \
   -configuration Debug \
   -destination "platform=macOS"
 xcodebuild test \
-  -project "Kuma NotiBar.xcodeproj" \
-  -scheme KumaNotiBar \
+  -project "Kuma Notify.xcodeproj" \
+  -scheme KumaNotify \
   -destination "platform=macOS"
 ```
 
@@ -61,12 +61,24 @@ Colors: green (all up), yellow (degraded: high ping >500ms / uptime <99% / cert 
 
 ### Settings
 
-`SettingsStore` wraps `UserDefaults`. `ServerConnection` stored as Codable JSON data. No SwiftData yet (Phase 3).
+`SettingsStore` wraps `UserDefaults`. `ServerConnection` stored as Codable JSON data.
+
+### Persistence (SwiftData)
+
+`PersistenceManager` (`@MainActor`) wraps `ModelContainer`/`ModelContext`. Injected into ViewModels via init (not SwiftUI environment, to avoid `MenuBarExtra` issues).
+
+- **`IncidentRecord`** — persists state transitions (went_down/recovered) with monitor info, timestamp, duration. Auto-purged after 90 days.
+- **`MonitorPreference`** — per-monitor pin/hide state. `@Attribute(.unique)` on `monitorId`.
+- Both models store `serverConnectionId: UUID` for Phase 4 multi-server compatibility.
+
+### Localization
+
+`Localizable.xcstrings` String Catalog with EN (base) + ES. All UI strings use `LocalizedStringKey` (SwiftUI) or `String(localized:)` (enums, notifications, ViewModels).
 
 ## Freemium model (planned, not yet implemented)
 
-Basic (free) + Pro (6.99€ one-time via StoreKit 2). See memory file `project_kuma_notibar.md` for full feature split.
+Basic (free) + Pro (6.99€ one-time via StoreKit 2). See memory file `project_kuma_notify.md` for full feature split.
 
 ## Development status
 
-Phases 1-2 complete. Pending: Phase 3 (SwiftData persistence, incident history), Phase 4 (StoreKit, multi-server), Phase 5 (widgets, Shortcuts), Phase 6 (localization, App Store).
+Phases 1-3 complete. Pending: Phase 4 (StoreKit, multi-server, export), Phase 5 (widgets, Shortcuts), Phase 6 (accessibility, App Store).
