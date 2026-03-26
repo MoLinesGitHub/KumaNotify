@@ -12,6 +12,7 @@ struct SummaryHeaderView: View {
                 Image(systemName: overallStatus.sfSymbol)
                     .foregroundStyle(overallStatus.color)
                     .font(.title3)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(overallStatus.label)
                         .font(.headline)
@@ -36,6 +37,7 @@ struct SummaryHeaderView: View {
                     Image(systemName: "shield.checkered")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                     Text("Last incident \(lastIncidentDate, format: .relative(presentation: .named))")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)

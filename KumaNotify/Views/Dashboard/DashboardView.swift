@@ -167,6 +167,7 @@ struct DashboardView: View {
             }
             .buttonStyle(.borderless)
             .disabled(menuBarVM.pollingEngine.isPolling)
+            .accessibilityLabel(String(localized: "Refresh"))
 
             Button {
                 if isPro {
@@ -179,6 +180,7 @@ struct DashboardView: View {
                 Image(systemName: "clock.arrow.circlepath")
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel(String(localized: "Incident History"))
 
             Button {
                 dashboardVM.copySummary()
@@ -186,6 +188,7 @@ struct DashboardView: View {
                 Image(systemName: "doc.on.doc")
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel(String(localized: "Copy Summary"))
 
             Spacer()
 
@@ -222,6 +225,7 @@ struct DashboardView: View {
             }
             .buttonStyle(.borderless)
             .menuIndicator(.hidden)
+            .accessibilityLabel(String(localized: "More Options"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

@@ -1220,6 +1220,96 @@
           }
         }
       }
+    },
+    "Refresh" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar"
+          }
+        }
+      }
+    },
+    "Copy Summary" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar resumen"
+          }
+        }
+      }
+    },
+    "More Options" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "M\u00e1s opciones"
+          }
+        }
+      }
+    },
+    "Response time trend" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tendencia de tiempo de respuesta"
+          }
+        }
+      }
+    },
+    "Uptime" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponibilidad"
+          }
+        }
+      }
+    },
+    "Uptime period" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Periodo de disponibilidad"
+          }
+        }
+      }
+    },
+    "Clear search" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpiar b\u00fasqueda"
+          }
+        }
+      }
+    },
+    "Battery saver" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahorro de bater\u00eda"
+          }
+        }
+      }
+    },
+    "Reduces polling frequency on battery power" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reduce la frecuencia de sondeo con bater\u00eda"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

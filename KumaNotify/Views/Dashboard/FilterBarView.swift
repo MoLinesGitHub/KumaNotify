@@ -13,7 +13,7 @@ struct FilterBarView: View {
                 filterButton(label: "Down", filter: .down, color: .red)
                 filterButton(label: "Pending", filter: .pending, color: .yellow)
                 Spacer()
-                Picker("", selection: $uptimePeriod) {
+                Picker(String(localized: "Uptime period"), selection: $uptimePeriod) {
                     ForEach(UptimePeriod.allCases, id: \.self) { period in
                         Text(period.rawValue).tag(period)
                     }
@@ -26,6 +26,7 @@ struct FilterBarView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.tertiary)
                     .font(.caption)
+                    .accessibilityHidden(true)
                 TextField("Search monitors...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.caption)
@@ -38,6 +39,7 @@ struct FilterBarView: View {
                             .font(.caption)
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel(String(localized: "Clear search"))
                 }
             }
             .padding(.horizontal, 8)

@@ -21,6 +21,7 @@ struct MaintenanceBannerView: View {
                 .foregroundStyle(.yellow)
                 .font(.caption)
                 .frame(width: 16)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(maintenance.title)

@@ -12,6 +12,18 @@ struct MonitorRowView: View {
     var onToggleHidden: (() -> Void)?
     var onToggleAcknowledge: (() -> Void)?
 
+    private var accessibilityDescription: String {
+        var parts = [monitor.name, monitor.currentStatus.label]
+        if let ping = monitor.latestPing { parts.append("\(ping)ms") }
+        if let uptime = uptimeForPeriod { parts.append(String(format: "%.1f%% uptime", uptime * 100)) }
+        if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
+            parts.append("cert expires in \(days) days")
+        }
+        if isPinned { parts.append("pinned") }
+        if isAcknowledged { parts.append("acknowledged") }
+        return parts.joined(separator: ", ")
+    }
+
     private var uptimeForPeriod: Double? {
         switch uptimePeriod {
         case .twentyFourHours: monitor.uptime24h
@@ -65,6 +77,8 @@ struct MonitorRowView: View {
         .padding(.horizontal, 8)
         .contentShape(Rectangle())
         .opacity(isHidden ? 0.5 : 1.0)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription)
         .contextMenu {
             Button {
                 onTogglePin?()

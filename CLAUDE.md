@@ -79,14 +79,21 @@ Colors: green (all up), yellow (degraded: high ping >500ms / uptime <99% / cert 
 
 `Localizable.xcstrings` String Catalog with EN (base) + ES. All UI strings use `LocalizedStringKey` (SwiftUI) or `String(localized:)` (enums, notifications, ViewModels).
 
-## Freemium model (planned, not yet implemented)
+## Freemium model
 
 Basic (free) + Pro (6.99€ one-time via StoreKit 2). See memory file `project_kuma_notify.md` for full feature split.
 
 ## Development status
 
-Phases 1-4 complete. See memory file `project_kuma_notify.md` for full feature roadmap.
+Phases 1-6 complete. See memory file `project_kuma_notify.md` for full feature roadmap.
 
 - **Phase 4 (done)**: StoreKit 2 + Pro gating, multi-server, export/share, DND, acknowledge, launch at login
 - **Phase 5 (done)**: Battery saver (PowerMonitor + IOKit), macOS widget (WidgetKit), Shortcuts/Siri (AppIntents). iOS/watchOS companion deferred.
-- **Phase 6 (pending)**: Accessibility audit, App Store submission
+- **Phase 6 (done)**: Accessibility audit (all views), App Store metadata
+
+## App Store metadata
+
+- **Category**: Utilities
+- **Keywords**: uptime, monitor, status, kuma, server, menu bar, notifications, downtime, heartbeat, devops
+- **Rating**: 4+
+- **Privacy**: No data collected. All monitoring data stays on device. Connects only to user-configured servers on local network.

@@ -32,6 +32,7 @@ struct IncidentHistoryView: View {
                     Image(systemName: "chevron.left")
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(String(localized: "Back"))
                 Text("Incident History")
                     .font(.headline)
                 Spacer()
@@ -78,6 +79,7 @@ struct IncidentHistoryView: View {
             Image(systemName: "clock.badge.checkmark")
                 .font(.system(size: 36))
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
             Text("No incidents recorded")
                 .font(.headline)
                 .foregroundStyle(.secondary)
