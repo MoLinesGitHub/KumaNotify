@@ -30,7 +30,7 @@ final class DashboardViewModel {
         let up = allMonitors.filter { $0.currentStatus == .up }.count
         let total = allMonitors.count
         let timeAgo = relativeTimeString
-        return String(localized: "\(up)/\(total) OK — \(timeAgo)")
+        return String(format: String(localized: "%lld/%lld OK — %@"), Int64(up), Int64(total), timeAgo)
     }
 
     var serverLatency: Int? {
