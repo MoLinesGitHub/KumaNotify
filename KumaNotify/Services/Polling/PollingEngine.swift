@@ -67,7 +67,7 @@ final class PollingEngine {
         consecutiveFailures += 1
     }
 
-    private var effectiveInterval: TimeInterval {
+    var effectiveInterval: TimeInterval {
         guard consecutiveFailures > 0 else { return interval }
         let backoff = interval * pow(2, Double(min(consecutiveFailures, 5)))
         return min(backoff, 300)

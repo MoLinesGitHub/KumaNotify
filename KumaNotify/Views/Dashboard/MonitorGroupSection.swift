@@ -21,21 +21,23 @@ struct MonitorGroupSection: View {
         Section {
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(group.monitors, id: \.id) { monitor in
-                    MonitorRowView(
-                        monitor: monitor,
-                        heartbeats: heartbeats[monitor.id],
-                        uptimePeriod: uptimePeriod,
-                        isPinned: prefFor(monitor)?.isPinned ?? false,
-                        isHidden: prefFor(monitor)?.isHidden ?? false,
-                        showProFeatures: showProFeatures,
-                        isAcknowledged: connectionId.map { acknowledgedMonitors.contains("\($0):\(monitor.id)") } ?? false,
-                        onTogglePin: { onTogglePin?(monitor) },
-                        onToggleHidden: { onToggleHidden?(monitor) },
-                        onToggleAcknowledge: { onToggleAcknowledge?(monitor) }
-                    )
-                    .onTapGesture {
+                    Button {
                         onMonitorTap?(monitor)
+                    } label: {
+                        MonitorRowView(
+                            monitor: monitor,
+                            heartbeats: heartbeats[monitor.id],
+                            uptimePeriod: uptimePeriod,
+                            isPinned: prefFor(monitor)?.isPinned ?? false,
+                            isHidden: prefFor(monitor)?.isHidden ?? false,
+                            showProFeatures: showProFeatures,
+                            isAcknowledged: connectionId.map { acknowledgedMonitors.contains("\($0):\(monitor.id)") } ?? false,
+                            onTogglePin: { onTogglePin?(monitor) },
+                            onToggleHidden: { onToggleHidden?(monitor) },
+                            onToggleAcknowledge: { onToggleAcknowledge?(monitor) }
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 6)

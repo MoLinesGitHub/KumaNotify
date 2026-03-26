@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import os
 
+@MainActor
 @main
 struct KumaNotifyApp: App {
     @State private var settingsStore: SettingsStore

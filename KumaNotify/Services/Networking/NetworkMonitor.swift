@@ -1,8 +1,9 @@
 import Foundation
 import Network
 
+@MainActor
 @Observable
-final class NetworkMonitor: @unchecked Sendable {
+final class NetworkMonitor {
     var isConnected = true
     var isExpensive = false
     var connectionType: NWInterface.InterfaceType?

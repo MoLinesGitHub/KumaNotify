@@ -8,12 +8,12 @@ final class PersistenceManager {
     let modelContainer: ModelContainer
     private let modelContext: ModelContext
 
-    init() throws {
+    init(isStoredInMemoryOnly: Bool = false) throws {
         let schema = Schema([IncidentRecord.self, MonitorPreference.self])
         let config = ModelConfiguration(
             "KumaNotify",
             schema: schema,
-            isStoredInMemoryOnly: false
+            isStoredInMemoryOnly: isStoredInMemoryOnly
         )
         self.modelContainer = try ModelContainer(for: schema, configurations: [config])
         self.modelContext = modelContainer.mainContext

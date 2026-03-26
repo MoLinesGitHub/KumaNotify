@@ -3,8 +3,9 @@ import SwiftUI
 import ServiceManagement
 import os
 
+@MainActor
 @Observable
-final class SettingsStore: @unchecked Sendable {
+final class SettingsStore {
     private let defaults: UserDefaults
 
     init(suiteName: String? = nil) {
