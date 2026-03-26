@@ -33,9 +33,14 @@ final class PersistenceManager {
         }
         var dedupDescriptor = FetchDescriptor<IncidentRecord>(predicate: dedupPredicate)
         dedupDescriptor.fetchLimit = 1
-        if let existing = try? modelContext.fetch(dedupDescriptor), !existing.isEmpty {
-            Logger.persistence.debug("Skipping duplicate incident for monitor \(monId)")
-            return
+        do {
+            let existing = try modelContext.fetch(dedupDescriptor)
+            if !existing.isEmpty {
+                Logger.persistence.debug("Skipping duplicate incident for monitor \(monId)")
+                return
+            }
+        } catch {
+            Logger.persistence.error("Dedup check failed for monitor \(monId): \(error.localizedDescription)")
         }
 
         modelContext.insert(record)

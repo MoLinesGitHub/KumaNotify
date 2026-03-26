@@ -4,8 +4,8 @@ import os
 
 @main
 struct KumaNotifyApp: App {
-    @State private var settingsStore = SettingsStore()
-    @State private var pollingEngine = PollingEngine()
+    @State private var settingsStore: SettingsStore
+    @State private var pollingEngine: PollingEngine
     @State private var persistence: PersistenceManager?
 
     @State private var menuBarVM: MenuBarViewModel?
@@ -119,7 +119,10 @@ struct KumaNotifyApp: App {
         persistence?.purgeOldIncidents()
 
         Task {
-            _ = await NotificationManager.shared.requestPermission()
+            let granted = await NotificationManager.shared.requestPermission()
+            if !granted {
+                Logger.app.warning("Notification permission not granted")
+            }
         }
 
         mbVM.startPolling()

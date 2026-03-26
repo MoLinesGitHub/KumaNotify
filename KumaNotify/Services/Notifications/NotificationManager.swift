@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import os
 
 final class NotificationManager: NSObject, Sendable {
     static let shared = NotificationManager()
@@ -9,11 +10,12 @@ final class NotificationManager: NSObject, Sendable {
             return try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound, .badge])
         } catch {
+            Logger.app.error("Notification permission request failed: \(error.localizedDescription)")
             return false
         }
     }
 
-    func sendDownAlert(monitorName: String, serverName: String) {
+    func sendDownAlert(monitorId: String, monitorName: String, serverName: String) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Down")
         content.subtitle = monitorName
@@ -22,24 +24,16 @@ final class NotificationManager: NSObject, Sendable {
         content.categoryIdentifier = "MONITOR_DOWN"
         content.interruptionLevel = .timeSensitive
 
-        let request = UNNotificationRequest(
-            identifier: "down_\(monitorName)_\(Date().timeIntervalSince1970)",
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
+        scheduleNotification(id: "down_\(monitorId)", content: content)
     }
 
-    func sendRecoveryAlert(monitorName: String, serverName: String, downDuration: TimeInterval?) {
+    func sendRecoveryAlert(monitorId: String, monitorName: String, serverName: String, downDuration: TimeInterval?) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Recovered")
         content.subtitle = monitorName
 
         if let duration = downDuration {
-            let formatter = DateComponentsFormatter()
-            formatter.unitsStyle = .abbreviated
-            formatter.allowedUnits = [.hour, .minute, .second]
-            let durationStr = formatter.string(from: duration) ?? "\(Int(duration))s"
+            let durationStr = Self.durationFormatter.string(from: duration) ?? "\(Int(duration))s"
             content.body = String(localized: "'\(monitorName)' is back up after \(durationStr).")
         } else {
             content.body = String(localized: "'\(monitorName)' on \(serverName) is back up.")
@@ -48,15 +42,10 @@ final class NotificationManager: NSObject, Sendable {
         content.sound = .default
         content.categoryIdentifier = "MONITOR_RECOVERY"
 
-        let request = UNNotificationRequest(
-            identifier: "recovery_\(monitorName)_\(Date().timeIntervalSince1970)",
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
+        scheduleNotification(id: "recovery_\(monitorId)", content: content)
     }
 
-    func sendCertExpiryWarning(monitorName: String, daysRemaining: Int) {
+    func sendCertExpiryWarning(monitorId: String, monitorName: String, daysRemaining: Int) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "SSL Certificate Expiring")
         content.subtitle = monitorName
@@ -64,11 +53,23 @@ final class NotificationManager: NSObject, Sendable {
         content.sound = .default
         content.categoryIdentifier = "CERT_EXPIRY"
 
-        let request = UNNotificationRequest(
-            identifier: "cert_\(monitorName)_\(daysRemaining)",
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
+        scheduleNotification(id: "cert_\(monitorId)_\(daysRemaining)", content: content)
     }
+
+    private func scheduleNotification(id: String, content: UNMutableNotificationContent) {
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                Logger.app.error("Failed to deliver notification '\(id)': \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private static let durationFormatter: DateComponentsFormatter = {
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .abbreviated
+        f.allowedUnits = [.hour, .minute, .second]
+        f.maximumUnitCount = 2
+        return f
+    }()
 }

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import os
 
 @Observable
 final class SettingsStore: @unchecked Sendable {
@@ -44,12 +45,21 @@ final class SettingsStore: @unchecked Sendable {
     var serverConnection: ServerConnection? {
         get {
             guard let data = defaults.data(forKey: "serverConnection") else { return nil }
-            return try? JSONDecoder().decode(ServerConnection.self, from: data)
+            do {
+                return try JSONDecoder().decode(ServerConnection.self, from: data)
+            } catch {
+                Logger.app.error("Failed to decode ServerConnection (\(data.count) bytes): \(error.localizedDescription)")
+                return nil
+            }
         }
         set {
             if let newValue {
-                let data = try? JSONEncoder().encode(newValue)
-                defaults.set(data, forKey: "serverConnection")
+                do {
+                    let data = try JSONEncoder().encode(newValue)
+                    defaults.set(data, forKey: "serverConnection")
+                } catch {
+                    Logger.app.error("Failed to encode ServerConnection: \(error.localizedDescription)")
+                }
             } else {
                 defaults.removeObject(forKey: "serverConnection")
             }
