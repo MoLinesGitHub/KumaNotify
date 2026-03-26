@@ -28,7 +28,7 @@ Uptime Kuma runs as a Docker container on a Synology NAS (local network). The NA
 macOS menu bar monitoring app. Swift 6, SwiftUI, macOS 14+, MVVM with `@Observable`.
 
 - **Agent app** (`LSUIElement: true`) — no Dock icon, `MenuBarExtra` with `.window` style for complex UI
-- **App Sandbox enabled** — with `network.client` + `NSAllowsLocalNetworking` for LAN access. `HTTPClient` sets `connectionProxyDictionary: [:]` to bypass iCloud Private Relay.
+- **App Sandbox enabled** — with `network.client` + `NSAllowsLocalNetworking` for LAN access. Users with iCloud Private Relay enabled must disable it for local network monitoring to work (Private Relay proxies LAN requests and returns 503).
 - **Signing**: Team ID `GD6M44DYPQ`, automatic
 - **XcodeGen**: `project.yml` is the source of truth for project structure
 

@@ -7,21 +7,24 @@ enum APIError: LocalizedError, Sendable {
     case decodingError(Error)
     case timeout
     case serverUnreachable
+    case privateRelayBlocked
 
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            "Invalid URL"
+            String(localized: "Invalid URL")
         case .networkError(let error):
-            "Network error: \(error.localizedDescription)"
+            String(format: String(localized: "Network error: %@"), error.localizedDescription)
         case .httpError(let code):
-            "HTTP error: \(code)"
+            String(format: String(localized: "HTTP error: %lld"), Int64(code))
         case .decodingError(let error):
-            "Decoding error: \(error.localizedDescription)"
+            String(format: String(localized: "Decoding error: %@"), error.localizedDescription)
         case .timeout:
-            "Request timed out"
+            String(localized: "Request timed out")
         case .serverUnreachable:
-            "Server unreachable"
+            String(localized: "Server unreachable")
+        case .privateRelayBlocked:
+            String(localized: "iCloud Private Relay is blocking local network access. Disable it in System Settings → iCloud → Private Relay.")
         }
     }
 }

@@ -12,6 +12,7 @@ struct KumaNotifyApp: App {
     @State private var menuBarVM: MenuBarViewModel?
     @State private var dashboardVM: DashboardViewModel?
     @State private var showOnboarding = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         MenuBarExtra {
@@ -24,23 +25,15 @@ struct KumaNotifyApp: App {
                     persistence: persistence
                 )
             } else {
-                VStack(spacing: 12) {
-                    Text("Kuma Notify")
-                        .font(.headline)
-                    Text("Configure a server in Settings")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("Setup Wizard...") {
-                        showOnboarding = true
+                EmptyStateView(
+                    onOpenWizard: {
+                        NSApp.activate(ignoringOtherApps: true)
+                        openWindow(id: "onboarding")
+                    },
+                    onQuit: {
+                        NSApplication.shared.terminate(nil)
                     }
-                    SettingsLink {
-                        Text("Open Settings...")
-                    }
-                    Divider()
-                    Button("Quit") { NSApplication.shared.terminate(nil) }
-                }
-                .padding()
-                .frame(width: 240)
+                )
             }
         } label: {
             if let menuBarVM {
@@ -52,6 +45,9 @@ struct KumaNotifyApp: App {
         }
         .menuBarExtraStyle(.window)
         .onChange(of: storeManager.proUnlocked) {
+            menuBarVM?.refreshPollingInterval()
+        }
+        .onChange(of: settingsStore.pollingInterval) {
             menuBarVM?.refreshPollingInterval()
         }
 
@@ -106,10 +102,14 @@ struct KumaNotifyApp: App {
     }
 
     private func setupViewModels() {
-        guard let connection = settingsStore.serverConnection else { return }
-
         // Stop old monitors before creating new VMs
         menuBarVM?.stopPolling()
+
+        guard let connection = settingsStore.serverConnection else {
+            menuBarVM = nil
+            dashboardVM = nil
+            return
+        }
 
         let mbVM = MenuBarViewModel(
             settingsStore: settingsStore,

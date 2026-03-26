@@ -8,7 +8,11 @@ final class SettingsStore: @unchecked Sendable {
     private let defaults: UserDefaults
 
     init(suiteName: String? = nil) {
-        self.defaults = suiteName.flatMap { UserDefaults(suiteName: $0) } ?? UserDefaults.standard
+        if let suiteName, let suiteDefaults = UserDefaults(suiteName: suiteName) {
+            self.defaults = suiteDefaults
+        } else {
+            self.defaults = UserDefaults.standard
+        }
         registerDefaults()
     }
 

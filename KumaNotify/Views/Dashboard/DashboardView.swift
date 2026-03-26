@@ -11,7 +11,13 @@ struct DashboardView: View {
 
     @State private var showPaywall = false
 
-    private var isPro: Bool { storeManager.proUnlocked }
+    private var isPro: Bool {
+        #if DEBUG
+        storeManager.effectiveProUnlocked
+        #else
+        storeManager.proUnlocked
+        #endif
+    }
     private var connections: [ServerConnection] { settingsStore.serverConnections }
     private var hasMultipleServers: Bool { connections.count > 1 }
 
@@ -34,6 +40,9 @@ struct DashboardView: View {
         .frame(minHeight: 300, maxHeight: 500)
         .task {
             await dashboardVM.fetchData()
+        }
+        .onChange(of: storeManager.proUnlocked) {
+            if storeManager.proUnlocked { showPaywall = false }
         }
     }
 
@@ -153,7 +162,10 @@ struct DashboardView: View {
     private func showShareSheet() {
         let items = dashboardVM.shareItems()
         let picker = NSSharingServicePicker(items: items)
-        guard let contentView = NSApp.keyWindow?.contentView else { return }
+        // MenuBarExtra panels may not be keyWindow; find the frontmost panel
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.className.contains("StatusBarWindow") })
+                ?? NSApp.keyWindow,
+              let contentView = window.contentView else { return }
         picker.show(relativeTo: .zero, of: contentView, preferredEdge: .minY)
     }
 
@@ -168,11 +180,14 @@ struct DashboardView: View {
     private var bottomToolbar: some View {
         HStack(spacing: 12) {
             Button {
-                Task { await dashboardVM.refresh() }
+                Task {
+                    await dashboardVM.refresh()
+                    await menuBarVM.refresh()
+                }
             } label: {
                 Image(systemName: "arrow.clockwise")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .disabled(menuBarVM.pollingEngine.isPolling)
             .accessibilityLabel(String(localized: "Refresh"))
 
@@ -186,7 +201,7 @@ struct DashboardView: View {
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .accessibilityLabel(String(localized: "Incident History"))
 
             Button {
@@ -194,7 +209,7 @@ struct DashboardView: View {
             } label: {
                 Image(systemName: "doc.on.doc")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .accessibilityLabel(String(localized: "Copy Summary"))
 
             Spacer()
@@ -230,11 +245,41 @@ struct DashboardView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .accessibilityLabel(String(localized: "More Options"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        #if DEBUG
+        .overlay(alignment: .bottom) {
+            debugProToggle
+                .padding(.top, 4)
+                .offset(y: 28)
+        }
+        #endif
     }
+
+    #if DEBUG
+    private var debugProToggle: some View {
+        HStack(spacing: 6) {
+            Text("Free")
+                .font(.caption2)
+                .foregroundStyle(isPro ? .secondary : .primary)
+            Toggle("", isOn: Binding(
+                get: { storeManager.debugProOverride ?? storeManager.proUnlocked },
+                set: { storeManager.debugProOverride = $0 }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .labelsHidden()
+            Text("Pro")
+                .font(.caption2)
+                .foregroundStyle(isPro ? .yellow : .secondary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(.ultraThinMaterial, in: Capsule())
+    }
+    #endif
 }

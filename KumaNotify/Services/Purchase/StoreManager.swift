@@ -6,6 +6,14 @@ import os
 @MainActor
 final class StoreManager {
     private(set) var proUnlocked = false
+
+    #if DEBUG
+    var debugProOverride: Bool? = nil
+
+    var effectiveProUnlocked: Bool {
+        debugProOverride ?? proUnlocked
+    }
+    #endif
     private(set) var proProduct: Product?
     private(set) var purchaseState: PurchaseState = .idle
 

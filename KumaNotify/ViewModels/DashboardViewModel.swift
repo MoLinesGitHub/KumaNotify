@@ -59,8 +59,10 @@ final class DashboardViewModel {
                     return matchesStatus && matchesSearch && passesHidden
                 }
                 .sorted { a, b in
-                    let aPinned = monitorPreferences[a.id]?.isPinned ?? false
-                    let bPinned = monitorPreferences[b.id]?.isPinned ?? false
+                    let aKey = MonitorPreference.makeCompositeKey(monitorId: a.id, serverConnectionId: connection.id)
+                    let bKey = MonitorPreference.makeCompositeKey(monitorId: b.id, serverConnectionId: connection.id)
+                    let aPinned = monitorPreferences[aKey]?.isPinned ?? false
+                    let bPinned = monitorPreferences[bKey]?.isPinned ?? false
                     if aPinned != bPinned { return aPinned }
                     return false
                 }

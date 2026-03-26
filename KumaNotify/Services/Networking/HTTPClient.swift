@@ -32,12 +32,22 @@ final class HTTPClient: HTTPClientProtocol, Sendable {
             || error.code == .networkConnectionLost
             || error.code == .notConnectedToInternet {
             throw APIError.serverUnreachable
+        } catch let error as URLError where error.failingURL?.host()?.contains("icloud") == true
+            || error.failingURL?.host()?.contains("mask") == true {
+            throw APIError.privateRelayBlocked
         } catch {
             throw APIError.networkError(error)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.serverUnreachable
+        }
+
+        // Detect Private Relay proxy blocking local network (returns 503)
+        if httpResponse.statusCode == 503,
+           let requestHost = request.url?.host(),
+           requestHost.hasPrefix("192.168.") || requestHost.hasPrefix("10.") || requestHost.hasPrefix("172.") {
+            throw APIError.privateRelayBlocked
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
