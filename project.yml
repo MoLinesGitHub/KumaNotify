@@ -36,6 +36,7 @@ targets:
     sources:
       - path: KumaNotify
       - path: KumaNotifyShared
+      - path: KumaNotifyIntents
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify
@@ -61,9 +62,35 @@ targets:
         com.apple.security.network.client: true
         com.apple.security.application-groups:
           - group.com.molinesdesigns.kuma-notify
+    dependencies:
+      - target: KumaNotifyWidget
+        embed: true
+        codeSign: true
+        copy:
+          destination: plugins
     scheme:
       testTargets:
         - KumaNotifyTests
+
+  KumaNotifyWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: KumaNotifyWidget
+      - path: KumaNotifyShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.widget
+        PRODUCT_NAME: KumaNotifyWidget
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks"
+    entitlements:
+      path: KumaNotifyWidget/KumaNotifyWidget.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.application-groups:
+          - group.com.molinesdesigns.kuma-notify
 
   KumaNotifyTests:
     type: bundle.unit-test

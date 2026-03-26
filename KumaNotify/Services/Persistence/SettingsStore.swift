@@ -7,8 +7,8 @@ import os
 final class SettingsStore: @unchecked Sendable {
     private let defaults: UserDefaults
 
-    init() {
-        self.defaults = UserDefaults.standard
+    init(suiteName: String? = nil) {
+        self.defaults = suiteName.flatMap { UserDefaults(suiteName: $0) } ?? UserDefaults.standard
         registerDefaults()
     }
 
@@ -27,9 +27,18 @@ final class SettingsStore: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "pollingInterval") }
     }
 
-    func effectivePollingInterval(isPro: Bool) -> TimeInterval {
+    var batterySaverEnabled: Bool {
+        get { defaults.bool(forKey: "batterySaverEnabled") }
+        set { defaults.set(newValue, forKey: "batterySaverEnabled") }
+    }
+
+    func effectivePollingInterval(isPro: Bool, isOnBattery: Bool = false, batteryLevel: Double = 1.0) -> TimeInterval {
         let floor = isPro ? AppConstants.minimumPollingPro : AppConstants.minimumPollingBasic
-        return max(pollingInterval, floor)
+        var interval = max(pollingInterval, floor)
+        if batterySaverEnabled && isOnBattery {
+            interval *= batteryLevel < 0.2 ? 3 : 2
+        }
+        return min(interval, AppConstants.maximumPollingInterval)
     }
 
     // MARK: - Appearance

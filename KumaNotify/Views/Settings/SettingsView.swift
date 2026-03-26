@@ -177,6 +177,15 @@ struct SettingsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                if isPro {
+                    Toggle("Battery saver", isOn: Binding(
+                        get: { settingsStore.batterySaverEnabled },
+                        set: { settingsStore.batterySaverEnabled = $0 }
+                    ))
+                    Text("Reduces polling frequency on battery power")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Notifications") {

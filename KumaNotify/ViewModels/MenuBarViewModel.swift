@@ -8,6 +8,7 @@ final class MenuBarViewModel {
     private let networkMonitor: NetworkMonitor
     private let persistence: PersistenceManager?
     private let storeManager: StoreManager?
+    private let powerMonitor: PowerMonitor
 
     var overallStatus: OverallStatus = .unreachable
     var upCount = 0
@@ -39,14 +40,17 @@ final class MenuBarViewModel {
         pollingEngine: PollingEngine,
         networkMonitor: NetworkMonitor = NetworkMonitor(),
         persistence: PersistenceManager? = nil,
-        storeManager: StoreManager? = nil
+        storeManager: StoreManager? = nil,
+        powerMonitor: PowerMonitor = PowerMonitor()
     ) {
         self.settingsStore = settingsStore
         self.pollingEngine = pollingEngine
         self.networkMonitor = networkMonitor
         self.persistence = persistence
         self.storeManager = storeManager
+        self.powerMonitor = powerMonitor
         self.networkMonitor.start()
+        self.powerMonitor.start()
     }
 
     func startPolling() {
@@ -61,7 +65,11 @@ final class MenuBarViewModel {
 
     func refreshPollingInterval() {
         let isPro = storeManager?.proUnlocked ?? false
-        pollingEngine.interval = settingsStore.effectivePollingInterval(isPro: isPro)
+        pollingEngine.interval = settingsStore.effectivePollingInterval(
+            isPro: isPro,
+            isOnBattery: powerMonitor.isOnBattery,
+            batteryLevel: powerMonitor.batteryLevel
+        )
     }
 
     func stopPolling() {
@@ -136,6 +144,24 @@ final class MenuBarViewModel {
                 overallStatus = .allUp
             }
             pollingEngine.reportSuccess()
+        }
+
+        publishWidgetData(downCount: allDown)
+        refreshPollingInterval()
+    }
+
+    private func publishWidgetData(downCount: Int) {
+        let data = WidgetData(
+            upCount: upCount,
+            totalCount: totalCount,
+            downCount: downCount,
+            overallStatusRaw: overallStatus.widgetKey,
+            lastCheckTime: lastCheckTime,
+            serverName: settingsStore.serverConnection?.name,
+            hasActiveIncident: hasActiveIncident
+        )
+        if let defaults = UserDefaults(suiteName: AppConstants.appGroupId) {
+            data.write(to: defaults)
         }
     }
 

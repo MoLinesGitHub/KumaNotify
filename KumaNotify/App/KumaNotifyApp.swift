@@ -73,7 +73,7 @@ struct KumaNotifyApp: App {
     }
 
     init() {
-        let store = SettingsStore()
+        let store = SettingsStore(suiteName: AppConstants.appGroupId)
         let engine = PollingEngine()
         let sm = StoreManager()
         _settingsStore = State(initialValue: store)

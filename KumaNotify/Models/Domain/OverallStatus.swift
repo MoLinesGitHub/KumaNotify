@@ -30,6 +30,15 @@ enum OverallStatus: Sendable {
         }
     }
 
+    var widgetKey: String {
+        switch self {
+        case .allUp: "allUp"
+        case .degraded: "degraded"
+        case .someDown: "someDown"
+        case .unreachable: "unreachable"
+        }
+    }
+
     var label: String {
         switch self {
         case .allUp: String(localized: "All systems operational")
