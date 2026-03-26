@@ -13,7 +13,7 @@ struct CertExpiryBadge: View {
         HStack(spacing: 2) {
             Image(systemName: "lock.shield")
                 .font(.system(size: 8))
-            Text("\(daysRemaining)d")
+            Text(String(format: String(localized: "%@d"), "\(daysRemaining)"))
                 .font(.caption2.monospacedDigit())
         }
         .padding(.horizontal, 5)

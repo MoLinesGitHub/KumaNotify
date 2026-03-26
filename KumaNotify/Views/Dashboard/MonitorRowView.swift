@@ -54,7 +54,7 @@ struct MonitorRowView: View {
 
                 HStack(spacing: 4) {
                     if let ping = monitor.latestPing {
-                        Text("\(ping)ms")
+                        Text(String(format: String(localized: "%@ms"), "\(ping)"))
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }

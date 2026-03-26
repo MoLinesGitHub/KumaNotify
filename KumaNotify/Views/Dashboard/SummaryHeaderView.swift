@@ -23,10 +23,10 @@ struct SummaryHeaderView: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
                     if let latency {
-                        Text("\(latency)ms")
+                        Text(String(format: String(localized: "%@ms"), "\(latency)"))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
-                        Text("avg")
+                        Text(String(localized: "avg"))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
