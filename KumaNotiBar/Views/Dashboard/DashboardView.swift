@@ -83,10 +83,8 @@ struct DashboardView: View {
                 Button("Open Status Page") { dashboardVM.openStatusPage() }
                 Button("Open Dashboard") { dashboardVM.openDashboard() }
                 Divider()
-                Button("Settings...") {
-                    #if os(macOS)
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                    #endif
+                SettingsLink {
+                    Text("Settings...")
                 }
                 Divider()
                 Button("Quit Kuma NotiBar") {

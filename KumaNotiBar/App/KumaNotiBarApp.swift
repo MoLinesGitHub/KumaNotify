@@ -26,8 +26,8 @@ struct KumaNotiBarApp: App {
                     Button("Setup Wizard...") {
                         showOnboarding = true
                     }
-                    Button("Open Settings...") {
-                        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                    SettingsLink {
+                        Text("Open Settings...")
                     }
                     Divider()
                     Button("Quit") { NSApplication.shared.terminate(nil) }

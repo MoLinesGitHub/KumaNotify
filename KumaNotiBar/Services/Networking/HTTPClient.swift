@@ -13,6 +13,8 @@ final class HTTPClient: HTTPClientProtocol, Sendable {
         config.timeoutIntervalForRequest = 10
         config.timeoutIntervalForResource = 15
         config.waitsForConnectivity = false
+        // Bypass iCloud Private Relay / proxy for local network connections
+        config.connectionProxyDictionary = [:]
         self.session = URLSession(configuration: config)
         self.decoder = JSONDecoder()
     }

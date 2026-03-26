@@ -4,6 +4,13 @@ struct SettingsView: View {
     @Bindable var settingsStore: SettingsStore
     var onSave: (() -> Void)?
 
+    @State private var serverURL: String = ""
+    @State private var slug: String = ""
+    @State private var serverName: String = ""
+    @State private var isTesting = false
+    @State private var testResult: (success: Bool, message: String)?
+    @State private var didLoad = false
+
     var body: some View {
         TabView {
             serverTab
@@ -13,7 +20,16 @@ struct SettingsView: View {
             generalTab
                 .tabItem { Label("General", systemImage: "gear") }
         }
-        .frame(width: 420, height: 320)
+        .frame(width: 420, height: 340)
+        .onAppear {
+            guard !didLoad else { return }
+            didLoad = true
+            if let conn = settingsStore.serverConnection {
+                serverURL = conn.baseURL.absoluteString
+                slug = conn.statusPageSlug
+                serverName = conn.name
+            }
+        }
     }
 
     // MARK: - Server Tab
@@ -21,19 +37,39 @@ struct SettingsView: View {
     private var serverTab: some View {
         Form {
             Section("Connection") {
-                TextField("Server URL", text: serverURLBinding)
+                TextField("Server URL", text: $serverURL, prompt: Text("http://192.168.1.100:3001"))
                     .textFieldStyle(.roundedBorder)
-                TextField("Status Page Slug", text: slugBinding)
+                TextField("Status Page Slug", text: $slug, prompt: Text("e.g. cortes"))
                     .textFieldStyle(.roundedBorder)
-                TextField("Display Name", text: nameBinding)
+                TextField("Display Name", text: $serverName, prompt: Text("My Server"))
                     .textFieldStyle(.roundedBorder)
             }
 
             Section {
-                Button("Test Connection") {
-                    // TODO: Phase 2
+                HStack {
+                    Button("Test Connection") {
+                        Task { await testConnection() }
+                    }
+                    .disabled(serverURL.isEmpty || slug.isEmpty || isTesting)
+
+                    if let testResult {
+                        Label(
+                            testResult.success ? "Connected" : "Failed",
+                            systemImage: testResult.success ? "checkmark.circle.fill" : "xmark.circle.fill"
+                        )
+                        .foregroundStyle(testResult.success ? .green : .red)
+                        .font(.caption)
+                    }
+
+                    Spacer()
+
+                    Button("Save & Connect") {
+                        saveConnection()
+                        onSave?()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(serverURL.isEmpty || slug.isEmpty)
                 }
-                .disabled(serverURLBinding.wrappedValue.isEmpty)
             }
         }
         .formStyle(.grouped)
@@ -92,50 +128,32 @@ struct SettingsView: View {
         .padding()
     }
 
-    // MARK: - Bindings
+    // MARK: - Actions
 
-    private var serverURLBinding: Binding<String> {
-        Binding(
-            get: { settingsStore.serverConnection?.baseURL.absoluteString ?? "" },
-            set: { newValue in
-                updateServerConnection { conn in
-                    if let url = URL(string: newValue) {
-                        conn.baseURL = url
-                    }
-                }
-            }
+    private func saveConnection() {
+        guard let url = URL(string: serverURL) else { return }
+        settingsStore.serverConnection = ServerConnection(
+            name: serverName.isEmpty ? "Server" : serverName,
+            baseURL: url,
+            statusPageSlug: slug
         )
     }
 
-    private var slugBinding: Binding<String> {
-        Binding(
-            get: { settingsStore.serverConnection?.statusPageSlug ?? "" },
-            set: { newValue in
-                updateServerConnection { conn in
-                    conn.statusPageSlug = newValue
-                }
-            }
-        )
-    }
+    private func testConnection() async {
+        saveConnection()
+        guard let connection = settingsStore.serverConnection else {
+            testResult = (false, "Invalid URL")
+            return
+        }
+        isTesting = true
+        defer { isTesting = false }
 
-    private var nameBinding: Binding<String> {
-        Binding(
-            get: { settingsStore.serverConnection?.name ?? "" },
-            set: { newValue in
-                updateServerConnection { conn in
-                    conn.name = newValue
-                }
-            }
-        )
-    }
-
-    private func updateServerConnection(_ update: (inout ServerConnection) -> Void) {
-        var conn = settingsStore.serverConnection ?? ServerConnection(
-            name: "",
-            baseURL: URL(string: "http://localhost:3025")!,
-            statusPageSlug: ""
-        )
-        update(&conn)
-        settingsStore.serverConnection = conn
+        let service = UptimeKumaService()
+        do {
+            _ = try await service.validateConnection(connection)
+            testResult = (true, "Connected")
+        } catch {
+            testResult = (false, error.localizedDescription)
+        }
     }
 }
