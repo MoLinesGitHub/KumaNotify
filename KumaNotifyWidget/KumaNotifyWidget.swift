@@ -126,8 +126,8 @@ struct KumaNotifyWidget: Widget {
         StaticConfiguration(kind: kind, provider: KumaNotifyProvider()) { entry in
             KumaNotifyWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Kuma Notify")
-        .description("Monitor your services at a glance.")
+        .configurationDisplayName(LocalizedStringResource("Kuma Notify"))
+        .description(LocalizedStringResource("Monitor your services at a glance."))
         .supportedFamilies([.systemSmall])
     }
 }

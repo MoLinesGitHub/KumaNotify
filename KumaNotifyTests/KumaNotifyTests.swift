@@ -9,6 +9,42 @@ final class KumaNotifyTests: XCTestCase {
         return (suiteName, SettingsStore(suiteName: suiteName))
     }
 
+    private func localizableCatalogContents() throws -> String {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let catalogURL = repoRoot.appendingPathComponent("KumaNotify/Resources/Localizable.xcstrings")
+        return try String(contentsOf: catalogURL, encoding: .utf8)
+    }
+
+    actor CountingMonitoringService: MonitoringServiceProtocol {
+        private(set) var statusPageCallCount = 0
+        private(set) var heartbeatCallCount = 0
+        let result: StatusPageResult
+
+        init(result: StatusPageResult) {
+            self.result = result
+        }
+
+        func fetchStatusPage(connection: ServerConnection) async throws -> StatusPageResult {
+            statusPageCallCount += 1
+            return result
+        }
+
+        func fetchHeartbeats(connection: ServerConnection) async throws -> HeartbeatResult {
+            heartbeatCallCount += 1
+            return HeartbeatResult(heartbeats: [:], uptimes: [:])
+        }
+
+        func validateConnection(_ connection: ServerConnection) async throws -> Bool {
+            true
+        }
+
+        func callCounts() -> (statusPage: Int, heartbeat: Int) {
+            (statusPageCallCount, heartbeatCallCount)
+        }
+    }
+
     func testMonitorStatusRawValues() {
         XCTAssertEqual(MonitorStatus.up.rawValue, 1)
         XCTAssertEqual(MonitorStatus.down.rawValue, 0)
@@ -260,6 +296,181 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertTrue(monitorCounts.contains("3"))
         XCTAssertTrue(monitorCounts.contains("2"))
         XCTAssertTrue(monitorCounts.contains("5"))
+    }
+
+    func testLocalizableCatalogContainsSystemSurfaceMetadata() throws {
+        let contents = try localizableCatalogContents()
+
+        [
+            "Check Monitor Status",
+            "Returns the current status of your monitored services.",
+            "Get Monitor Count",
+            "Returns how many monitors are up and total.",
+            "Check Status",
+            "Check %@ status",
+            "How are my monitors in %@?",
+            "Are my servers up in %@?",
+            "Monitor your services at a glance."
+        ].forEach { key in
+            XCTAssertTrue(contents.contains("\"\(key)\""), "Missing localization key: \(key)")
+        }
+    }
+
+    @MainActor
+    func testPersistenceManagerFetchRecentIncidentsCanScopeToConnection() throws {
+        let manager = try PersistenceManager(isStoredInMemoryOnly: true)
+        let primaryID = UUID()
+        let secondaryID = UUID()
+
+        manager.recordIncident(IncidentRecord(
+            monitorId: "primary-api",
+            monitorName: "Primary API",
+            serverConnectionId: primaryID,
+            serverName: "Primary",
+            transitionType: .wentDown
+        ))
+        manager.recordIncident(IncidentRecord(
+            monitorId: "secondary-api",
+            monitorName: "Secondary API",
+            serverConnectionId: secondaryID,
+            serverName: "Secondary",
+            transitionType: .wentDown
+        ))
+
+        let primaryIncidents = manager.fetchRecentIncidents(serverConnectionId: primaryID, limit: 10)
+
+        XCTAssertEqual(primaryIncidents.count, 1)
+        XCTAssertEqual(primaryIncidents.first?.serverConnectionId, primaryID)
+    }
+
+    @MainActor
+    func testDashboardViewModelScopesIncidentHistoryAndExportsToSelectedConnection() throws {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let manager = try PersistenceManager(isStoredInMemoryOnly: true)
+        let primaryID = UUID()
+        let secondaryID = UUID()
+
+        let primaryConnection = ServerConnection(
+            id: primaryID,
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+
+        manager.recordIncident(IncidentRecord(
+            monitorId: "secondary-api",
+            monitorName: "Secondary API",
+            serverConnectionId: secondaryID,
+            serverName: "Secondary",
+            transitionType: .wentDown,
+            timestamp: Date().addingTimeInterval(-300)
+        ))
+        manager.recordIncident(IncidentRecord(
+            monitorId: "primary-api",
+            monitorName: "Primary API",
+            serverConnectionId: primaryID,
+            serverName: "Primary",
+            transitionType: .recovered,
+            timestamp: Date(),
+            downDuration: 42
+        ))
+
+        let viewModel = DashboardViewModel(
+            connection: primaryConnection,
+            settingsStore: store,
+            persistence: manager
+        )
+
+        viewModel.loadIncidentHistory()
+        viewModel.loadLastIncidentDate()
+
+        XCTAssertEqual(viewModel.incidentRecords.count, 1)
+        XCTAssertEqual(viewModel.incidentRecords.first?.serverConnectionId, primaryID)
+        XCTAssertNotNil(viewModel.lastIncidentDate)
+
+        let exportURL = try XCTUnwrap(viewModel.exportIncidentsJSON())
+        defer { try? FileManager.default.removeItem(at: exportURL) }
+
+        let data = try Data(contentsOf: exportURL)
+        let items = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        )
+
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items.first?["serverName"] as? String, "Primary")
+    }
+
+    @MainActor
+    func testDashboardViewModelUsesHeartbeatsFromStatusPageResultWithoutExtraFetch() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let monitor = UnifiedMonitor(
+            id: "api",
+            name: "API",
+            type: "http",
+            currentStatus: .up,
+            latestPing: 90,
+            uptime24h: 1,
+            uptime7d: 1,
+            uptime30d: 1,
+            certExpiryDays: nil,
+            validCert: nil,
+            url: nil,
+            lastStatusChange: nil
+        )
+        let heartbeat = UnifiedHeartbeat(
+            status: .up,
+            time: Date(),
+            message: "OK",
+            ping: 90
+        )
+        let service = CountingMonitoringService(
+            result: StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: [monitor])],
+                heartbeats: ["api": [heartbeat]],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: false
+            )
+        )
+        let viewModel = DashboardViewModel(
+            connection: connection,
+            settingsStore: store,
+            serviceFactory: { _ in service }
+        )
+
+        await viewModel.fetchData()
+        let counts = await service.callCounts()
+
+        XCTAssertEqual(counts.statusPage, 1)
+        XCTAssertEqual(counts.heartbeat, 0)
+        XCTAssertEqual(viewModel.heartbeats["api"]?.count, 1)
+    }
+
+    func testNotificationIdentifiersAreNamespacedByServerConnection() {
+        let primaryID = UUID()
+        let secondaryID = UUID()
+
+        XCTAssertNotEqual(
+            NotificationManager.downAlertIdentifier(serverConnectionId: primaryID, monitorId: "api"),
+            NotificationManager.downAlertIdentifier(serverConnectionId: secondaryID, monitorId: "api")
+        )
+        XCTAssertNotEqual(
+            NotificationManager.recoveryAlertIdentifier(serverConnectionId: primaryID, monitorId: "api"),
+            NotificationManager.recoveryAlertIdentifier(serverConnectionId: secondaryID, monitorId: "api")
+        )
+        XCTAssertNotEqual(
+            NotificationManager.certExpiryIdentifier(serverConnectionId: primaryID, monitorId: "api", daysRemaining: 7),
+            NotificationManager.certExpiryIdentifier(serverConnectionId: secondaryID, monitorId: "api", daysRemaining: 7)
+        )
     }
 
     @MainActor

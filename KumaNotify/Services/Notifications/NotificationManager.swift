@@ -5,6 +5,18 @@ import os
 final class NotificationManager: NSObject, Sendable {
     static let shared = NotificationManager()
 
+    static func downAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
+        "down_\(serverConnectionId.uuidString)_\(monitorId)"
+    }
+
+    static func recoveryAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
+        "recovery_\(serverConnectionId.uuidString)_\(monitorId)"
+    }
+
+    static func certExpiryIdentifier(serverConnectionId: UUID, monitorId: String, daysRemaining: Int) -> String {
+        "cert_\(serverConnectionId.uuidString)_\(monitorId)_\(daysRemaining)"
+    }
+
     func requestPermission() async -> Bool {
         do {
             return try await UNUserNotificationCenter.current()
@@ -15,7 +27,13 @@ final class NotificationManager: NSObject, Sendable {
         }
     }
 
-    func sendDownAlert(monitorId: String, monitorName: String, serverName: String, soundOption: NotificationSoundOption = .system) {
+    func sendDownAlert(
+        serverConnectionId: UUID,
+        monitorId: String,
+        monitorName: String,
+        serverName: String,
+        soundOption: NotificationSoundOption = .system
+    ) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Down")
         content.subtitle = monitorName
@@ -24,10 +42,20 @@ final class NotificationManager: NSObject, Sendable {
         content.categoryIdentifier = "MONITOR_DOWN"
         content.interruptionLevel = .timeSensitive
 
-        scheduleNotification(id: "down_\(monitorId)", content: content)
+        scheduleNotification(
+            id: Self.downAlertIdentifier(serverConnectionId: serverConnectionId, monitorId: monitorId),
+            content: content
+        )
     }
 
-    func sendRecoveryAlert(monitorId: String, monitorName: String, serverName: String, downDuration: TimeInterval?, soundOption: NotificationSoundOption = .system) {
+    func sendRecoveryAlert(
+        serverConnectionId: UUID,
+        monitorId: String,
+        monitorName: String,
+        serverName: String,
+        downDuration: TimeInterval?,
+        soundOption: NotificationSoundOption = .system
+    ) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Recovered")
         content.subtitle = monitorName
@@ -42,10 +70,19 @@ final class NotificationManager: NSObject, Sendable {
         content.sound = soundOption == .silent ? nil : .default
         content.categoryIdentifier = "MONITOR_RECOVERY"
 
-        scheduleNotification(id: "recovery_\(monitorId)", content: content)
+        scheduleNotification(
+            id: Self.recoveryAlertIdentifier(serverConnectionId: serverConnectionId, monitorId: monitorId),
+            content: content
+        )
     }
 
-    func sendCertExpiryWarning(monitorId: String, monitorName: String, daysRemaining: Int, soundOption: NotificationSoundOption = .system) {
+    func sendCertExpiryWarning(
+        serverConnectionId: UUID,
+        monitorId: String,
+        monitorName: String,
+        daysRemaining: Int,
+        soundOption: NotificationSoundOption = .system
+    ) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "SSL Certificate Expiring")
         content.subtitle = monitorName
@@ -53,7 +90,14 @@ final class NotificationManager: NSObject, Sendable {
         content.sound = soundOption == .silent ? nil : .default
         content.categoryIdentifier = "CERT_EXPIRY"
 
-        scheduleNotification(id: "cert_\(monitorId)_\(daysRemaining)", content: content)
+        scheduleNotification(
+            id: Self.certExpiryIdentifier(
+                serverConnectionId: serverConnectionId,
+                monitorId: monitorId,
+                daysRemaining: daysRemaining
+            ),
+            content: content
+        )
     }
 
     func sendTestNotification(soundOption: NotificationSoundOption = .system) {

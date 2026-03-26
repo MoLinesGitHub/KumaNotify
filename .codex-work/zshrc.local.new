@@ -1,0 +1,6 @@
+export HOMEBREW_VERBOSE="${HOMEBREW_VERBOSE:-0}"
+export ZSH_PROMPT_ENGINE="capsule_literal"
+
+# Overrides locales opcionales:
+# export HOMEBREW_AUTO_UPDATE_SECS=21600
+# alias ll='ls -lAh'

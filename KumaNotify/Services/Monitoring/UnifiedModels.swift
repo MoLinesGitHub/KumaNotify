@@ -48,6 +48,7 @@ struct UnifiedMaintenance: Sendable, Identifiable {
 struct StatusPageResult: Sendable {
     let title: String
     let groups: [UnifiedGroup]
+    let heartbeats: [String: [UnifiedHeartbeat]]
     let incidents: [UKIncident]
     let maintenances: [UnifiedMaintenance]
     let showCertExpiry: Bool

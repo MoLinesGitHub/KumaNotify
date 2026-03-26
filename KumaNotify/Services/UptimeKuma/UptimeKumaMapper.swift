@@ -39,6 +39,7 @@ struct UptimeKumaMapper: Sendable {
         return StatusPageResult(
             title: response.config.title,
             groups: groups,
+            heartbeats: heartbeatResult?.heartbeats ?? [:],
             incidents: response.incidents,
             maintenances: maintenances,
             showCertExpiry: response.config.showCertificateExpiry

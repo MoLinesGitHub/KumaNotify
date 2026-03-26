@@ -56,13 +56,27 @@ final class PersistenceManager {
         }
     }
 
-    func fetchRecentIncidents(limit: Int = AppConstants.maxIncidentHistoryDisplay) -> [IncidentRecord] {
-        var descriptor = FetchDescriptor<IncidentRecord>(
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-        )
-        descriptor.fetchLimit = limit
+    func fetchRecentIncidents(
+        serverConnectionId: UUID? = nil,
+        limit: Int = AppConstants.maxIncidentHistoryDisplay
+    ) -> [IncidentRecord] {
         do {
-            return try modelContext.fetch(descriptor)
+            let descriptor: FetchDescriptor<IncidentRecord>
+            if let serverConnectionId {
+                let predicate = #Predicate<IncidentRecord> { $0.serverConnectionId == serverConnectionId }
+                descriptor = FetchDescriptor(
+                    predicate: predicate,
+                    sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+                )
+            } else {
+                descriptor = FetchDescriptor(
+                    sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+                )
+            }
+
+            var boundedDescriptor = descriptor
+            boundedDescriptor.fetchLimit = limit
+            return try modelContext.fetch(boundedDescriptor)
         } catch {
             Logger.persistence.error("Failed to fetch incidents: \(error.localizedDescription)")
             return []

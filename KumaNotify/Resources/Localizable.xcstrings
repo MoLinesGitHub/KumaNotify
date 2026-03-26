@@ -300,6 +300,16 @@
         }
       }
     },
+    "Are my servers up in %@?" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Están activos mis servidores en %@?"
+          }
+        }
+      }
+    },
     "avg" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -374,6 +384,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Limpiar búsqueda"
+          }
+        }
+      }
+    },
+    "Check %@ status" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprobar el estado de %@"
+          }
+        }
+      }
+    },
+    "Check Monitor Status" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprobar estado de monitores"
+          }
+        }
+      }
+    },
+    "Check Status" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprobar estado"
           }
         }
       }
@@ -663,6 +703,16 @@
         }
       }
     },
+    "Get Monitor Count" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtener recuento de monitores"
+          }
+        }
+      }
+    },
     "Hide" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -681,6 +731,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Error HTTP: %lld"
+          }
+        }
+      }
+    },
+    "How are my monitors in %@?" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Cómo están mis monitores en %@?"
           }
         }
       }
@@ -875,6 +935,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Monitor caído"
+          }
+        }
+      }
+    },
+    "Monitor your services at a glance." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supervisa tus servicios de un vistazo."
           }
         }
       }
@@ -1214,6 +1284,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reduce la frecuencia de sondeo con batería"
+          }
+        }
+      }
+    },
+    "Returns how many monitors are up and total." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devuelve cuántos monitores están activos y cuántos hay en total."
+          }
+        }
+      }
+    },
+    "Returns the current status of your monitored services." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devuelve el estado actual de tus servicios monitorizados."
           }
         }
       }

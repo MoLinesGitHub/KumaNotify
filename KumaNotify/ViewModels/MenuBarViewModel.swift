@@ -210,6 +210,7 @@ final class MenuBarViewModel {
                 monitorDownSince[key] = Date()
                 if !isAcknowledged {
                     notifications.sendDownAlert(
+                        serverConnectionId: connection.id,
                         monitorId: monitor.id, monitorName: monitor.name,
                         serverName: connection.name, soundOption: soundOption
                     )
@@ -228,6 +229,7 @@ final class MenuBarViewModel {
                 settingsStore.unacknowledgeMonitor(connectionId: connection.id, monitorId: monitor.id)
                 if !isAcknowledged {
                     notifications.sendRecoveryAlert(
+                        serverConnectionId: connection.id,
                         monitorId: monitor.id, monitorName: monitor.name,
                         serverName: connection.name, downDuration: downDuration,
                         soundOption: soundOption

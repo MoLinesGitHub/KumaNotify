@@ -1,0 +1,24 @@
+typeset -g ZSH_PROMPT_ENGINE="${ZSH_PROMPT_ENGINE:-p10k}"
+
+case "$ZSH_PROMPT_ENGINE" in
+  p10k)
+    if (( $+functions[zinit] )); then
+      zinit ice depth=1
+      zinit light romkatv/powerlevel10k
+    fi
+
+    if (( $+functions[p10k] )) && [[ -r "$HOME/.p10k.zsh" ]]; then
+      source "$HOME/.p10k.zsh"
+    elif command_exists starship; then
+      eval "$(starship init zsh)"
+    fi
+    ;;
+  starship)
+    if command_exists starship; then
+      eval "$(starship init zsh)"
+    fi
+    ;;
+  capsule_literal)
+    [[ -r "$HOME/.config/zsh/prompt-capsule-literal.zsh" ]] && source "$HOME/.config/zsh/prompt-capsule-literal.zsh"
+    ;;
+esac

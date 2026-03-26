@@ -6,6 +6,7 @@ import AppKit
 final class DashboardViewModel {
     private let settingsStore: SettingsStore
     private let persistence: PersistenceManager?
+    private let serviceFactory: (MonitoringProvider) -> any MonitoringServiceProtocol
     private(set) var connection: ServerConnection {
         didSet { recomputeFilteredGroups() }
     }
@@ -47,27 +48,27 @@ final class DashboardViewModel {
     init(
         connection: ServerConnection,
         settingsStore: SettingsStore,
-        persistence: PersistenceManager? = nil
+        persistence: PersistenceManager? = nil,
+        serviceFactory: @escaping (MonitoringProvider) -> any MonitoringServiceProtocol = MonitoringServiceFactory.create
     ) {
         self.connection = connection
         self.settingsStore = settingsStore
         self.persistence = persistence
+        self.serviceFactory = serviceFactory
         recomputeDerivedState()
     }
 
     func fetchData() async {
-        let service = MonitoringServiceFactory.create(for: connection.provider)
+        let service = serviceFactory(connection.provider)
         isLoading = true
         defer { isLoading = false }
 
         do {
             let result = try await service.fetchStatusPage(connection: connection)
             groups = result.groups
+            heartbeats = result.heartbeats
             incidents = result.incidents
             maintenances = result.maintenances
-
-            let hbResult = try await service.fetchHeartbeats(connection: connection)
-            heartbeats = hbResult.heartbeats
 
             lastFetchTime = Date()
             errorMessage = nil
@@ -99,11 +100,11 @@ final class DashboardViewModel {
     }
 
     func loadIncidentHistory() {
-        incidentRecords = persistence?.fetchRecentIncidents() ?? []
+        incidentRecords = persistence?.fetchRecentIncidents(serverConnectionId: connection.id) ?? []
     }
 
     func loadLastIncidentDate() {
-        let recent = persistence?.fetchRecentIncidents(limit: 1) ?? []
+        let recent = persistence?.fetchRecentIncidents(serverConnectionId: connection.id, limit: 1) ?? []
         lastIncidentDate = recent.first?.timestamp
     }
 
@@ -162,7 +163,7 @@ final class DashboardViewModel {
     // MARK: - Export
 
     func exportIncidentsCSV() -> URL? {
-        let records = persistence?.fetchRecentIncidents() ?? []
+        let records = persistence?.fetchRecentIncidents(serverConnectionId: connection.id) ?? []
         guard !records.isEmpty else { return nil }
 
         var csv = "Timestamp,Monitor,Server,Type,Duration (s)\n"
@@ -177,7 +178,7 @@ final class DashboardViewModel {
     }
 
     func exportIncidentsJSON() -> URL? {
-        let records = persistence?.fetchRecentIncidents() ?? []
+        let records = persistence?.fetchRecentIncidents(serverConnectionId: connection.id) ?? []
         guard !records.isEmpty else { return nil }
 
         let isoFormatter = ISO8601DateFormatter()
