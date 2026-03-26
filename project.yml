@@ -58,7 +58,7 @@ targets:
     entitlements:
       path: KumaNotify/Entitlements/KumaNotify.entitlements
       properties:
-        com.apple.security.app-sandbox: false
+        com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.application-groups:
           - group.com.molinesdesigns.kuma-notify
@@ -88,7 +88,7 @@ targets:
     entitlements:
       path: KumaNotifyWidget/KumaNotifyWidget.entitlements
       properties:
-        com.apple.security.app-sandbox: false
+        com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
           - group.com.molinesdesigns.kuma-notify
 
