@@ -85,4 +85,8 @@ Basic (free) + Pro (6.99€ one-time via StoreKit 2). See memory file `project_k
 
 ## Development status
 
-Phases 1-3 complete. Pending: Phase 4 (StoreKit, multi-server, export), Phase 5 (widgets, Shortcuts), Phase 6 (accessibility, App Store).
+Phases 1-4 complete. See memory file `project_kuma_notify.md` for full feature roadmap.
+
+- **Phase 4 (done)**: StoreKit 2 + Pro gating, multi-server, export/share, DND, acknowledge, launch at login
+- **Phase 5 (pending)**: macOS widget, Shortcuts/Siri, battery saver, iOS/watchOS companion
+- **Phase 6 (pending)**: Accessibility audit, App Store submission

@@ -5,9 +5,13 @@ struct MonitorGroupSection: View {
     let heartbeats: [String: [UnifiedHeartbeat]]
     var uptimePeriod: UptimePeriod = .twentyFourHours
     var monitorPreferences: [String: MonitorPreference] = [:]
+    var showProFeatures: Bool = true
+    var acknowledgedMonitors: Set<String> = []
+    var connectionId: UUID?
     let onMonitorTap: ((UnifiedMonitor) -> Void)?
     var onTogglePin: ((UnifiedMonitor) -> Void)?
     var onToggleHidden: ((UnifiedMonitor) -> Void)?
+    var onToggleAcknowledge: ((UnifiedMonitor) -> Void)?
 
     var body: some View {
         Section {
@@ -18,8 +22,11 @@ struct MonitorGroupSection: View {
                     uptimePeriod: uptimePeriod,
                     isPinned: monitorPreferences[monitor.id]?.isPinned ?? false,
                     isHidden: monitorPreferences[monitor.id]?.isHidden ?? false,
+                    showProFeatures: showProFeatures,
+                    isAcknowledged: connectionId.map { acknowledgedMonitors.contains("\($0):\(monitor.id)") } ?? false,
                     onTogglePin: { onTogglePin?(monitor) },
-                    onToggleHidden: { onToggleHidden?(monitor) }
+                    onToggleHidden: { onToggleHidden?(monitor) },
+                    onToggleAcknowledge: { onToggleAcknowledge?(monitor) }
                 )
                 .onTapGesture {
                     onMonitorTap?(monitor)

@@ -1,12 +1,27 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 struct DashboardView: View {
     @Bindable var menuBarVM: MenuBarViewModel
     @Bindable var dashboardVM: DashboardViewModel
+    var storeManager: StoreManager
+    var settingsStore: SettingsStore
+    var persistence: PersistenceManager?
+
+    @State private var showPaywall = false
+
+    private var isPro: Bool { storeManager.proUnlocked }
+    private var connections: [ServerConnection] { settingsStore.serverConnections }
+    private var hasMultipleServers: Bool { connections.count > 1 }
 
     var body: some View {
         VStack(spacing: 0) {
-            if dashboardVM.showIncidentHistory {
+            if showPaywall {
+                PaywallView(storeManager: storeManager) {
+                    showPaywall = false
+                }
+            } else if dashboardVM.showIncidentHistory {
                 IncidentHistoryView(
                     incidents: dashboardVM.incidentRecords,
                     onDismiss: { dashboardVM.showIncidentHistory = false }
@@ -24,21 +39,29 @@ struct DashboardView: View {
 
     private var mainContent: some View {
         VStack(spacing: 0) {
+            // Server selector (only when multiple servers exist)
+            if hasMultipleServers {
+                serverSelector
+                Divider()
+            }
+
             SummaryHeaderView(
                 summary: dashboardVM.summaryText,
                 latency: dashboardVM.serverLatency,
-                overallStatus: menuBarVM.overallStatus
+                overallStatus: menuBarVM.overallStatus,
+                lastIncidentDate: dashboardVM.lastIncidentDate
             )
 
             Divider()
 
-            FilterBarView(
-                statusFilter: $dashboardVM.statusFilter,
-                searchText: $dashboardVM.searchText,
-                uptimePeriod: $dashboardVM.uptimePeriod
-            )
-
-            Divider()
+            if isPro {
+                FilterBarView(
+                    statusFilter: $dashboardVM.statusFilter,
+                    searchText: $dashboardVM.searchText,
+                    uptimePeriod: $dashboardVM.uptimePeriod
+                )
+                Divider()
+            }
 
             if let error = dashboardVM.errorMessage {
                 HStack {
@@ -52,6 +75,11 @@ struct DashboardView: View {
                 Divider()
             }
 
+            if isPro, !dashboardVM.maintenances.isEmpty {
+                MaintenanceBannerView(maintenances: dashboardVM.maintenances)
+                Divider()
+            }
+
             ScrollView {
                 LazyVStack(spacing: 8, pinnedViews: .sectionHeaders) {
                     ForEach(dashboardVM.filteredGroups, id: \.id) { group in
@@ -60,9 +88,13 @@ struct DashboardView: View {
                             heartbeats: dashboardVM.heartbeats,
                             uptimePeriod: dashboardVM.uptimePeriod,
                             monitorPreferences: dashboardVM.monitorPreferences,
-                            onMonitorTap: nil,
-                            onTogglePin: { dashboardVM.togglePin(for: $0) },
-                            onToggleHidden: { dashboardVM.toggleHidden(for: $0) }
+                            showProFeatures: isPro,
+                            acknowledgedMonitors: isPro ? settingsStore.acknowledgedMonitors : [],
+                            connectionId: dashboardVM.connection.id,
+                            onMonitorTap: { dashboardVM.openMonitor($0) },
+                            onTogglePin: isPro ? { dashboardVM.togglePin(for: $0) } : { _ in showPaywall = true },
+                            onToggleHidden: isPro ? { dashboardVM.toggleHidden(for: $0) } : { _ in showPaywall = true },
+                            onToggleAcknowledge: isPro ? { dashboardVM.toggleAcknowledge(for: $0) } : { _ in showPaywall = true }
                         )
                     }
                 }
@@ -76,6 +108,56 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - Server Selector
+
+    private var serverSelector: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "server.rack")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Picker("", selection: Binding(
+                get: { dashboardVM.connection.id },
+                set: { newId in switchServer(to: newId) }
+            )) {
+                ForEach(connections) { conn in
+                    Text(conn.name).tag(conn.id)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    private func exportFile(_ url: URL?) {
+        guard let url else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = url.lastPathComponent
+        panel.allowedContentTypes = [.data]
+        panel.begin { response in
+            if response == .OK, let dest = panel.url {
+                try? FileManager.default.copyItem(at: url, to: dest)
+            }
+        }
+    }
+
+    private func showShareSheet() {
+        let items = dashboardVM.shareItems()
+        let picker = NSSharingServicePicker(items: items)
+        guard let contentView = NSApp.keyWindow?.contentView else { return }
+        picker.show(relativeTo: .zero, of: contentView, preferredEdge: .minY)
+    }
+
+    private func switchServer(to id: UUID) {
+        guard let conn = connections.first(where: { $0.id == id }) else { return }
+        dashboardVM.switchConnection(conn)
+        Task { await dashboardVM.fetchData() }
+    }
+
+    // MARK: - Bottom Toolbar
+
     private var bottomToolbar: some View {
         HStack(spacing: 12) {
             Button {
@@ -87,8 +169,12 @@ struct DashboardView: View {
             .disabled(menuBarVM.pollingEngine.isPolling)
 
             Button {
-                dashboardVM.loadIncidentHistory()
-                dashboardVM.showIncidentHistory = true
+                if isPro {
+                    dashboardVM.loadIncidentHistory()
+                    dashboardVM.showIncidentHistory = true
+                } else {
+                    showPaywall = true
+                }
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
             }
@@ -107,7 +193,22 @@ struct DashboardView: View {
                 Button("Open Status Page") { dashboardVM.openStatusPage() }
                 Button("Open Dashboard") { dashboardVM.openDashboard() }
                 Divider()
-                Toggle("Show Hidden Monitors", isOn: $dashboardVM.showHiddenMonitors)
+                if isPro {
+                    Toggle("Show Hidden Monitors", isOn: $dashboardVM.showHiddenMonitors)
+                    Menu("Export Incidents") {
+                        Button("CSV") { exportFile(dashboardVM.exportIncidentsCSV()) }
+                        Button("JSON") { exportFile(dashboardVM.exportIncidentsJSON()) }
+                    }
+                    Button("Share Status...") { showShareSheet() }
+                    Button("Email Report") {
+                        if let url = dashboardVM.buildEmailReport() {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+                if !isPro {
+                    Button("Upgrade to Pro...") { showPaywall = true }
+                }
                 Divider()
                 SettingsLink {
                     Text("Settings...")

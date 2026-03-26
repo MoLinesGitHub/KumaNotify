@@ -7,6 +7,7 @@ struct KumaNotifyApp: App {
     @State private var settingsStore: SettingsStore
     @State private var pollingEngine: PollingEngine
     @State private var persistence: PersistenceManager?
+    @State private var storeManager: StoreManager
 
     @State private var menuBarVM: MenuBarViewModel?
     @State private var dashboardVM: DashboardViewModel?
@@ -17,7 +18,10 @@ struct KumaNotifyApp: App {
             if let menuBarVM, let dashboardVM {
                 DashboardView(
                     menuBarVM: menuBarVM,
-                    dashboardVM: dashboardVM
+                    dashboardVM: dashboardVM,
+                    storeManager: storeManager,
+                    settingsStore: settingsStore,
+                    persistence: persistence
                 )
             } else {
                 VStack(spacing: 12) {
@@ -47,9 +51,12 @@ struct KumaNotifyApp: App {
             }
         }
         .menuBarExtraStyle(.window)
+        .onChange(of: storeManager.proUnlocked) {
+            menuBarVM?.refreshPollingInterval()
+        }
 
         Settings {
-            SettingsView(settingsStore: settingsStore) {
+            SettingsView(settingsStore: settingsStore, storeManager: storeManager) {
                 setupViewModels()
             }
         }
@@ -68,8 +75,10 @@ struct KumaNotifyApp: App {
     init() {
         let store = SettingsStore()
         let engine = PollingEngine()
+        let sm = StoreManager()
         _settingsStore = State(initialValue: store)
         _pollingEngine = State(initialValue: engine)
+        _storeManager = State(initialValue: sm)
 
         do {
             let pm = try PersistenceManager()
@@ -80,15 +89,14 @@ struct KumaNotifyApp: App {
         }
 
         if let connection = store.serverConnection {
-            let service = MonitoringServiceFactory.create(for: connection.provider)
             _menuBarVM = State(initialValue: MenuBarViewModel(
-                service: service,
                 settingsStore: store,
                 pollingEngine: engine,
-                persistence: _persistence.wrappedValue
+                persistence: _persistence.wrappedValue,
+                storeManager: sm
             ))
             _dashboardVM = State(initialValue: DashboardViewModel(
-                service: service,
+                connection: connection,
                 settingsStore: store,
                 persistence: _persistence.wrappedValue
             ))
@@ -99,16 +107,15 @@ struct KumaNotifyApp: App {
 
     private func setupViewModels() {
         guard let connection = settingsStore.serverConnection else { return }
-        let service = MonitoringServiceFactory.create(for: connection.provider)
 
         let mbVM = MenuBarViewModel(
-            service: service,
             settingsStore: settingsStore,
             pollingEngine: pollingEngine,
-            persistence: persistence
+            persistence: persistence,
+            storeManager: storeManager
         )
         let dbVM = DashboardViewModel(
-            service: service,
+            connection: connection,
             settingsStore: settingsStore,
             persistence: persistence
         )

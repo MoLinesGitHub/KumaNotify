@@ -15,19 +15,19 @@ final class NotificationManager: NSObject, Sendable {
         }
     }
 
-    func sendDownAlert(monitorId: String, monitorName: String, serverName: String) {
+    func sendDownAlert(monitorId: String, monitorName: String, serverName: String, soundOption: NotificationSoundOption = .system) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Down")
         content.subtitle = monitorName
         content.body = String(localized: "'\(monitorName)' on \(serverName) is not responding.")
-        content.sound = .default
+        content.sound = soundOption == .silent ? nil : .default
         content.categoryIdentifier = "MONITOR_DOWN"
         content.interruptionLevel = .timeSensitive
 
         scheduleNotification(id: "down_\(monitorId)", content: content)
     }
 
-    func sendRecoveryAlert(monitorId: String, monitorName: String, serverName: String, downDuration: TimeInterval?) {
+    func sendRecoveryAlert(monitorId: String, monitorName: String, serverName: String, downDuration: TimeInterval?, soundOption: NotificationSoundOption = .system) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Recovered")
         content.subtitle = monitorName
@@ -39,21 +39,30 @@ final class NotificationManager: NSObject, Sendable {
             content.body = String(localized: "'\(monitorName)' on \(serverName) is back up.")
         }
 
-        content.sound = .default
+        content.sound = soundOption == .silent ? nil : .default
         content.categoryIdentifier = "MONITOR_RECOVERY"
 
         scheduleNotification(id: "recovery_\(monitorId)", content: content)
     }
 
-    func sendCertExpiryWarning(monitorId: String, monitorName: String, daysRemaining: Int) {
+    func sendCertExpiryWarning(monitorId: String, monitorName: String, daysRemaining: Int, soundOption: NotificationSoundOption = .system) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "SSL Certificate Expiring")
         content.subtitle = monitorName
         content.body = String(localized: "Certificate for '\(monitorName)' expires in \(daysRemaining) days.")
-        content.sound = .default
+        content.sound = soundOption == .silent ? nil : .default
         content.categoryIdentifier = "CERT_EXPIRY"
 
         scheduleNotification(id: "cert_\(monitorId)_\(daysRemaining)", content: content)
+    }
+
+    func sendTestNotification(soundOption: NotificationSoundOption = .system) {
+        let content = UNMutableNotificationContent()
+        content.title = "Kuma Notify"
+        content.body = String(localized: "Test notification — sound is working!")
+        content.sound = soundOption == .silent ? nil : .default
+
+        scheduleNotification(id: "test_\(UUID().uuidString)", content: content)
     }
 
     private func scheduleNotification(id: String, content: UNMutableNotificationContent) {

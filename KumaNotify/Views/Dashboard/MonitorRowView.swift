@@ -6,8 +6,19 @@ struct MonitorRowView: View {
     var uptimePeriod: UptimePeriod = .twentyFourHours
     var isPinned: Bool = false
     var isHidden: Bool = false
+    var showProFeatures: Bool = true
+    var isAcknowledged: Bool = false
     var onTogglePin: (() -> Void)?
     var onToggleHidden: (() -> Void)?
+    var onToggleAcknowledge: (() -> Void)?
+
+    private var uptimeForPeriod: Double? {
+        switch uptimePeriod {
+        case .twentyFourHours: monitor.uptime24h
+        case .sevenDays: monitor.uptime7d ?? monitor.uptime24h
+        case .thirtyDays: monitor.uptime30d ?? monitor.uptime24h
+        }
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -31,7 +42,7 @@ struct MonitorRowView: View {
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
-                    if let uptime = monitor.uptime24h {
+                    if showProFeatures, let uptime = uptimeForPeriod {
                         UptimeBadge(percentage: uptime, period: uptimePeriod)
                     }
                     if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
@@ -42,7 +53,7 @@ struct MonitorRowView: View {
 
             Spacer()
 
-            if let beats = heartbeats, beats.count >= 2 {
+            if showProFeatures, let beats = heartbeats, beats.count >= 2 {
                 SparklineView(
                     dataPoints: beats.compactMap(\.ping).suffix(20).map { $0 },
                     color: monitor.currentStatus.color
@@ -70,6 +81,17 @@ struct MonitorRowView: View {
                     isHidden ? String(localized: "Show") : String(localized: "Hide"),
                     systemImage: isHidden ? "eye" : "eye.slash"
                 )
+            }
+            if monitor.currentStatus == .down {
+                Divider()
+                Button {
+                    onToggleAcknowledge?()
+                } label: {
+                    Label(
+                        isAcknowledged ? String(localized: "Unacknowledge") : String(localized: "Acknowledge"),
+                        systemImage: isAcknowledged ? "bell" : "bell.slash"
+                    )
+                }
             }
         }
     }

@@ -26,11 +26,21 @@ struct UptimeKumaMapper: Sendable {
                 )
             }
 
+        let maintenances = response.maintenanceList.map { m in
+            UnifiedMaintenance(
+                id: String(m.id ?? 0),
+                title: m.title ?? String(localized: "Scheduled Maintenance"),
+                description: m.description,
+                startDate: m.start.flatMap { Self.dateFormatter.date(from: $0) },
+                endDate: m.end.flatMap { Self.dateFormatter.date(from: $0) }
+            )
+        }
+
         return StatusPageResult(
             title: response.config.title,
             groups: groups,
             incidents: response.incidents,
-            maintenances: response.maintenanceList,
+            maintenances: maintenances,
             showCertExpiry: response.config.showCertificateExpiry
         )
     }
@@ -62,7 +72,6 @@ struct UptimeKumaMapper: Sendable {
         let monitorId = String(monitor.id)
         let beats = heartbeatResult?.heartbeats[monitorId]
         let lastBeat = beats?.last
-        let uptimeKey = "\(monitor.id)_24"
 
         return UnifiedMonitor(
             id: monitorId,
@@ -70,7 +79,9 @@ struct UptimeKumaMapper: Sendable {
             type: monitor.type,
             currentStatus: lastBeat?.status ?? .pending,
             latestPing: lastBeat?.ping,
-            uptime24h: heartbeatResult?.uptimes[uptimeKey],
+            uptime24h: heartbeatResult?.uptimes["\(monitor.id)_24"],
+            uptime7d: heartbeatResult?.uptimes["\(monitor.id)_720"],
+            uptime30d: heartbeatResult?.uptimes["\(monitor.id)_43200"],
             certExpiryDays: monitor.certExpiryDaysRemaining,
             validCert: monitor.validCert,
             url: nil,

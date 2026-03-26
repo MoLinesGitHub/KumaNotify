@@ -4,6 +4,7 @@ struct SummaryHeaderView: View {
     let summary: String
     let latency: Int?
     let overallStatus: OverallStatus
+    var lastIncidentDate: Date?
 
     var body: some View {
         VStack(spacing: 6) {
@@ -19,8 +20,8 @@ struct SummaryHeaderView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if let latency {
-                    VStack(alignment: .trailing, spacing: 1) {
+                VStack(alignment: .trailing, spacing: 1) {
+                    if let latency {
                         Text("\(latency)ms")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
@@ -28,6 +29,17 @@ struct SummaryHeaderView: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
+                }
+            }
+            if let lastIncidentDate {
+                HStack(spacing: 4) {
+                    Image(systemName: "shield.checkered")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text("Last incident \(lastIncidentDate, format: .relative(presentation: .named))")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
                 }
             }
         }

@@ -12,7 +12,7 @@ final class PollingEngine {
 
     var interval: TimeInterval = AppConstants.defaultPollingInterval {
         didSet {
-            guard interval != oldValue, timer != nil else { return }
+            guard interval != oldValue, timer != nil, pollAction != nil else { return }
             stop()
             start()
         }

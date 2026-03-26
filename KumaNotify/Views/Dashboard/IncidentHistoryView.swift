@@ -12,7 +12,7 @@ struct IncidentHistoryView: View {
             } else if calendar.isDateInYesterday(incident.timestamp) {
                 return String(localized: "Yesterday")
             } else {
-                return incident.timestamp.formatted(.dateTime.month(.abbreviated).day())
+                return incident.timestamp.formatted(.dateTime.day().month(.abbreviated).year())
             }
         }
         let keyed = incidents.map { (key: dateKey(for: $0), incident: $0) }

@@ -1,0 +1,61 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "com.molinesdesigns.kumanotify.storekit",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "6.99",
+      "familyShareable" : false,
+      "internalID" : "1",
+      "localizations" : [
+        {
+          "description" : "Unlock all Pro features",
+          "displayName" : "Kuma Notify Pro",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Desbloquea todas las funciones Pro",
+          "displayName" : "Kuma Notify Pro",
+          "locale" : "es_ES"
+        }
+      ],
+      "productID" : "com.molinesdesigns.kumanotify.pro",
+      "referenceName" : "Kuma Notify Pro",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "1",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "GD6M44DYPQ",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "es_ES",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "ESP",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 5,
+    "minor" : 0
+  }
+}

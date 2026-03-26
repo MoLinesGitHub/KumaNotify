@@ -7,6 +7,8 @@ struct UnifiedMonitor: MonitorRepresentable, Hashable {
     var currentStatus: MonitorStatus
     var latestPing: Int?
     var uptime24h: Double?
+    var uptime7d: Double?
+    var uptime30d: Double?
     var certExpiryDays: Int?
     var validCert: Bool?
     var url: URL?
@@ -35,11 +37,19 @@ struct UnifiedHeartbeat: HeartbeatRepresentable {
     let ping: Int?
 }
 
+struct UnifiedMaintenance: Sendable, Identifiable {
+    let id: String
+    let title: String
+    let description: String?
+    let startDate: Date?
+    let endDate: Date?
+}
+
 struct StatusPageResult: Sendable {
     let title: String
     let groups: [UnifiedGroup]
     let incidents: [UKIncident]
-    let maintenances: [UKMaintenance]
+    let maintenances: [UnifiedMaintenance]
     let showCertExpiry: Bool
 }
 
