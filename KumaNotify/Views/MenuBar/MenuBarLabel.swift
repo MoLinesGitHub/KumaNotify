@@ -4,7 +4,12 @@ struct MenuBarLabel: View {
     let viewModel: MenuBarViewModel
 
     private var accessibilityDescription: String {
-        "\(viewModel.overallStatus.label). \(viewModel.upCount) of \(viewModel.totalCount) monitors up."
+        String.localizedStringWithFormat(
+            String(localized: "%@. %lld of %lld monitors up."),
+            viewModel.overallStatus.label,
+            Int64(viewModel.upCount),
+            Int64(viewModel.totalCount)
+        )
     }
 
     var body: some View {

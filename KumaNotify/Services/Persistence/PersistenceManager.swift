@@ -24,23 +24,27 @@ final class PersistenceManager {
     func recordIncident(_ record: IncidentRecord) {
         // Deduplication: skip if same monitor+transition within 60s
         let windowStart = record.timestamp.addingTimeInterval(-60)
-        let monId = record.monitorId
-        let transition = record.transitionType
-        let dedupPredicate = #Predicate<IncidentRecord> {
-            $0.monitorId == monId &&
-            $0.transitionType == transition &&
-            $0.timestamp > windowStart
-        }
-        var dedupDescriptor = FetchDescriptor<IncidentRecord>(predicate: dedupPredicate)
-        dedupDescriptor.fetchLimit = 1
+
         do {
-            let existing = try modelContext.fetch(dedupDescriptor)
-            if !existing.isEmpty {
-                Logger.persistence.debug("Skipping duplicate incident for monitor \(monId)")
+            var recentDescriptor = FetchDescriptor<IncidentRecord>(
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+            recentDescriptor.fetchLimit = 25
+
+            let recent = try modelContext.fetch(recentDescriptor)
+            let isDuplicate = recent.contains {
+                $0.monitorId == record.monitorId &&
+                $0.serverConnectionId == record.serverConnectionId &&
+                $0.transitionType == record.transitionType &&
+                $0.timestamp > windowStart
+            }
+
+            if isDuplicate {
+                Logger.persistence.debug("Skipping duplicate incident for monitor \(record.monitorId)")
                 return
             }
         } catch {
-            Logger.persistence.error("Dedup check failed for monitor \(monId): \(error.localizedDescription)")
+            Logger.persistence.error("Dedup check failed for monitor \(record.monitorId): \(error.localizedDescription)")
         }
 
         modelContext.insert(record)

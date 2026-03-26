@@ -131,11 +131,12 @@ final class KumaNotifyTests: XCTestCase {
     func testPersistenceManagerDeduplicatesRepeatedIncidentsWithinWindow() throws {
         let manager = try PersistenceManager(isStoredInMemoryOnly: true)
         let timestamp = Date()
+        let serverConnectionId = UUID()
 
         manager.recordIncident(IncidentRecord(
             monitorId: "api",
             monitorName: "API",
-            serverConnectionId: UUID(),
+            serverConnectionId: serverConnectionId,
             serverName: "Prod",
             transitionType: .wentDown,
             timestamp: timestamp
@@ -143,7 +144,7 @@ final class KumaNotifyTests: XCTestCase {
         manager.recordIncident(IncidentRecord(
             monitorId: "api",
             monitorName: "API",
-            serverConnectionId: UUID(),
+            serverConnectionId: serverConnectionId,
             serverName: "Prod",
             transitionType: .wentDown,
             timestamp: timestamp.addingTimeInterval(30)
