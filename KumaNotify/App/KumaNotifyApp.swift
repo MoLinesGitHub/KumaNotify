@@ -108,6 +108,9 @@ struct KumaNotifyApp: App {
     private func setupViewModels() {
         guard let connection = settingsStore.serverConnection else { return }
 
+        // Stop old monitors before creating new VMs
+        menuBarVM?.stopPolling()
+
         let mbVM = MenuBarViewModel(
             settingsStore: settingsStore,
             pollingEngine: pollingEngine,

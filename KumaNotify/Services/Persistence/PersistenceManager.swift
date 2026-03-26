@@ -85,7 +85,7 @@ final class PersistenceManager {
         let descriptor = FetchDescriptor<MonitorPreference>()
         do {
             let results = try modelContext.fetch(descriptor)
-            return Dictionary(results.map { ($0.monitorId, $0) }, uniquingKeysWith: { _, new in new })
+            return Dictionary(results.map { ($0.compositeKey, $0) }, uniquingKeysWith: { _, new in new })
         } catch {
             Logger.persistence.error("Failed to fetch preferences: \(error.localizedDescription)")
             return [:]

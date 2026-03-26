@@ -31,7 +31,7 @@ struct KumaNotifyProvider: TimelineProvider {
     }
 
     private func makeEntry() -> KumaNotifyEntry {
-        let defaults = UserDefaults(suiteName: "group.com.molinesdesigns.kuma-notify")
+        let defaults = UserDefaults(suiteName: AppConstants.appGroupId)
         let data = defaults.flatMap { WidgetData.read(from: $0) }
         return KumaNotifyEntry(date: .now, data: data)
     }
@@ -90,7 +90,7 @@ struct KumaNotifyWidgetEntryView: View {
             Image(systemName: "antenna.radiowaves.left.and.right.slash")
                 .font(.title2)
                 .foregroundStyle(.secondary)
-            Text("Open Kuma Notify to start monitoring")
+            Text(String(localized: "Open Kuma Notify to start monitoring"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -111,7 +111,7 @@ struct KumaNotifyWidgetEntryView: View {
         switch data.overallStatusRaw {
         case "allUp": String(localized: "All OK")
         case "degraded": String(localized: "Degraded")
-        case "someDown": "\(data.downCount) down"
+        case "someDown": String(format: String(localized: "%lld down"), data.downCount)
         default: String(localized: "Offline")
         }
     }

@@ -12,7 +12,7 @@ final class PowerMonitor {
     func start() {
         updatePowerState()
 
-        let context = Unmanaged.passUnretained(self).toOpaque()
+        let context = Unmanaged.passRetained(self).toOpaque()
         runLoopSource = IOPSNotificationCreateRunLoopSource({ context in
             guard let context else { return }
             let monitor = Unmanaged<PowerMonitor>.fromOpaque(context).takeUnretainedValue()
@@ -27,6 +27,8 @@ final class PowerMonitor {
     func stop() {
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .defaultMode)
+            // Release the retained self from start()
+            Unmanaged<PowerMonitor>.passUnretained(self).release()
             runLoopSource = nil
         }
     }

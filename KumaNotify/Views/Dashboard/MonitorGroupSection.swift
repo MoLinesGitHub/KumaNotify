@@ -20,8 +20,8 @@ struct MonitorGroupSection: View {
                     monitor: monitor,
                     heartbeats: heartbeats[monitor.id],
                     uptimePeriod: uptimePeriod,
-                    isPinned: monitorPreferences[monitor.id]?.isPinned ?? false,
-                    isHidden: monitorPreferences[monitor.id]?.isHidden ?? false,
+                    isPinned: prefFor(monitor)?.isPinned ?? false,
+                    isHidden: prefFor(monitor)?.isHidden ?? false,
                     showProFeatures: showProFeatures,
                     isAcknowledged: connectionId.map { acknowledgedMonitors.contains("\($0):\(monitor.id)") } ?? false,
                     onTogglePin: { onTogglePin?(monitor) },
@@ -48,5 +48,11 @@ struct MonitorGroupSection: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
         }
+    }
+
+    private func prefFor(_ monitor: UnifiedMonitor) -> MonitorPreference? {
+        guard let cid = connectionId else { return monitorPreferences[monitor.id] }
+        let key = MonitorPreference.makeCompositeKey(monitorId: monitor.id, serverConnectionId: cid)
+        return monitorPreferences[key]
     }
 }

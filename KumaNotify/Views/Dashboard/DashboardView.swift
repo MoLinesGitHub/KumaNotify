@@ -138,7 +138,14 @@ struct DashboardView: View {
         panel.allowedContentTypes = [.data]
         panel.begin { response in
             if response == .OK, let dest = panel.url {
-                try? FileManager.default.copyItem(at: url, to: dest)
+                do {
+                    if FileManager.default.fileExists(atPath: dest.path) {
+                        try FileManager.default.removeItem(at: dest)
+                    }
+                    try FileManager.default.copyItem(at: url, to: dest)
+                } catch {
+                    // NSSavePanel already handles overwrite confirmation
+                }
             }
         }
     }

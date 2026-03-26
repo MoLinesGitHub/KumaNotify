@@ -53,7 +53,8 @@ final class DashboardViewModel {
                     let matchesStatus = statusFilter == nil || monitor.currentStatus == statusFilter
                     let matchesSearch = searchText.isEmpty
                         || monitor.name.localizedCaseInsensitiveContains(searchText)
-                    let pref = monitorPreferences[monitor.id]
+                    let prefKey = MonitorPreference.makeCompositeKey(monitorId: monitor.id, serverConnectionId: connection.id)
+                    let pref = monitorPreferences[prefKey]
                     let passesHidden = showHiddenMonitors || !(pref?.isHidden ?? false)
                     return matchesStatus && matchesSearch && passesHidden
                 }

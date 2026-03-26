@@ -19,7 +19,7 @@ final class NotificationManager: NSObject, Sendable {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Down")
         content.subtitle = monitorName
-        content.body = String(localized: "'\(monitorName)' on \(serverName) is not responding.")
+        content.body = String(format: String(localized: "'%@' on %@ is not responding."), monitorName, serverName)
         content.sound = soundOption == .silent ? nil : .default
         content.categoryIdentifier = "MONITOR_DOWN"
         content.interruptionLevel = .timeSensitive
@@ -34,9 +34,9 @@ final class NotificationManager: NSObject, Sendable {
 
         if let duration = downDuration {
             let durationStr = Self.durationFormatter.string(from: duration) ?? "\(Int(duration))s"
-            content.body = String(localized: "'\(monitorName)' is back up after \(durationStr).")
+            content.body = String(format: String(localized: "'%@' is back up after %@."), monitorName, durationStr)
         } else {
-            content.body = String(localized: "'\(monitorName)' on \(serverName) is back up.")
+            content.body = String(format: String(localized: "'%@' on %@ is back up."), monitorName, serverName)
         }
 
         content.sound = soundOption == .silent ? nil : .default
@@ -49,7 +49,7 @@ final class NotificationManager: NSObject, Sendable {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "SSL Certificate Expiring")
         content.subtitle = monitorName
-        content.body = String(localized: "Certificate for '\(monitorName)' expires in \(daysRemaining) days.")
+        content.body = String(format: String(localized: "Certificate for '%@' expires in %lld days."), monitorName, daysRemaining)
         content.sound = soundOption == .silent ? nil : .default
         content.categoryIdentifier = "CERT_EXPIRY"
 

@@ -74,6 +74,8 @@ final class MenuBarViewModel {
 
     func stopPolling() {
         pollingEngine.stop()
+        networkMonitor.stop()
+        powerMonitor.stop()
     }
 
     func refresh() async {

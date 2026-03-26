@@ -6,7 +6,7 @@ struct CheckStatusIntent: AppIntent {
     nonisolated static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
-        let defaults = UserDefaults(suiteName: "group.com.molinesdesigns.kuma-notify")
+        let defaults = UserDefaults(suiteName: AppConstants.appGroupId)
         guard let defaults, let data = WidgetData.read(from: defaults) else {
             return .result(value: "No data", dialog: "Kuma Notify has no status data. Open the app first.")
         }
@@ -30,7 +30,7 @@ struct GetMonitorCountIntent: AppIntent {
     nonisolated static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let defaults = UserDefaults(suiteName: "group.com.molinesdesigns.kuma-notify")
+        let defaults = UserDefaults(suiteName: AppConstants.appGroupId)
         guard let defaults, let data = WidgetData.read(from: defaults) else {
             return .result(value: "No data")
         }

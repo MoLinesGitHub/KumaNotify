@@ -14,7 +14,7 @@ struct StatusDot: View {
             .animation(
                 animated
                     ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
-                    : .default,
+                    : nil,
                 value: isPulsing
             )
             .onAppear {
