@@ -2,6 +2,35 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+enum DashboardViewLogic {
+    enum Surface: Equatable {
+        case paywall
+        case incidentHistory
+        case mainContent
+    }
+
+    static func currentSurface(
+        showPaywall: Bool,
+        showIncidentHistory: Bool
+    ) -> Surface {
+        if showPaywall { return .paywall }
+        if showIncidentHistory { return .incidentHistory }
+        return .mainContent
+    }
+
+    static func shouldShowServerSelector(connectionCount: Int) -> Bool {
+        connectionCount > 1
+    }
+
+    static func shouldShowFilterBar(isPro: Bool) -> Bool {
+        isPro
+    }
+
+    static func shouldShowMaintenanceBanner(isPro: Bool, maintenanceCount: Int) -> Bool {
+        isPro && maintenanceCount > 0
+    }
+}
+
 struct DashboardView: View {
     @Bindable var menuBarVM: MenuBarViewModel
     @Bindable var dashboardVM: DashboardViewModel
@@ -19,20 +48,24 @@ struct DashboardView: View {
         #endif
     }
     private var connections: [ServerConnection] { settingsStore.serverConnections }
-    private var hasMultipleServers: Bool { connections.count > 1 }
+    private var hasMultipleServers: Bool { DashboardViewLogic.shouldShowServerSelector(connectionCount: connections.count) }
 
     var body: some View {
         VStack(spacing: 0) {
-            if showPaywall {
+            switch DashboardViewLogic.currentSurface(
+                showPaywall: showPaywall,
+                showIncidentHistory: dashboardVM.showIncidentHistory
+            ) {
+            case .paywall:
                 PaywallView(storeManager: storeManager) {
                     showPaywall = false
                 }
-            } else if dashboardVM.showIncidentHistory {
+            case .incidentHistory:
                 IncidentHistoryView(
                     incidents: dashboardVM.incidentRecords,
                     onDismiss: { dashboardVM.showIncidentHistory = false }
                 )
-            } else {
+            case .mainContent:
                 mainContent
             }
         }
@@ -68,7 +101,7 @@ struct DashboardView: View {
 
             Divider()
 
-            if isPro {
+            if DashboardViewLogic.shouldShowFilterBar(isPro: isPro) {
                 FilterBarView(
                     statusFilter: $dashboardVM.statusFilter,
                     searchText: $dashboardVM.searchText,
@@ -89,7 +122,10 @@ struct DashboardView: View {
                 Divider()
             }
 
-            if isPro, !dashboardVM.maintenances.isEmpty {
+            if DashboardViewLogic.shouldShowMaintenanceBanner(
+                isPro: isPro,
+                maintenanceCount: dashboardVM.maintenances.count
+            ) {
                 MaintenanceBannerView(maintenances: dashboardVM.maintenances)
                 Divider()
             }

@@ -1,6 +1,45 @@
 import SwiftUI
 import AppKit
 
+enum SettingsViewLogic {
+    enum NotificationToggleDecision: Equatable {
+        case disable
+        case enableImmediately
+        case requestSystemPermission
+        case showSystemSettingsHelp
+    }
+
+    static func canAddServer(isPro: Bool, serverCount: Int) -> Bool {
+        isPro || serverCount < 1
+    }
+
+    static func shouldShowMultiServerUpsell(isPro: Bool, serverCount: Int) -> Bool {
+        !isPro && serverCount > 0
+    }
+
+    static func notificationToggleDecision(
+        enabling: Bool,
+        authorizationStatus: NotificationAuthorizationStatus
+    ) -> NotificationToggleDecision {
+        guard enabling else { return .disable }
+
+        switch authorizationStatus {
+        case .authorized:
+            return .enableImmediately
+        case .notDetermined:
+            return .requestSystemPermission
+        case .denied:
+            return .showSystemSettingsHelp
+        }
+    }
+
+    static func shouldShowDeniedNotificationBanner(
+        authorizationStatus: NotificationAuthorizationStatus
+    ) -> Bool {
+        authorizationStatus == .denied
+    }
+}
+
 struct SettingsView: View {
     @Bindable var settingsStore: SettingsStore
     var storeManager: StoreManager?
@@ -92,16 +131,25 @@ struct SettingsView: View {
             Section {
                 HStack {
                     Button("Add Server") {
-                        if !isPro && settingsStore.serverConnections.count >= 1 {
+                        if !SettingsViewLogic.canAddServer(
+                            isPro: isPro,
+                            serverCount: settingsStore.serverConnections.count
+                        ) {
                             // Pro required for 2+ servers — handled by disabled state
                         } else {
                             isAddingNew = true
                         }
                     }
-                    .disabled(!isPro && settingsStore.serverConnections.count >= 1)
+                    .disabled(!SettingsViewLogic.canAddServer(
+                        isPro: isPro,
+                        serverCount: settingsStore.serverConnections.count
+                    ))
                     .accessibilityIdentifier("settings.addServerButton")
 
-                    if !isPro && !settingsStore.serverConnections.isEmpty {
+                    if SettingsViewLogic.shouldShowMultiServerUpsell(
+                        isPro: isPro,
+                        serverCount: settingsStore.serverConnections.count
+                    ) {
                         Text("Pro required for multiple servers")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -222,29 +270,31 @@ struct SettingsView: View {
                 Toggle("Enable notifications", isOn: Binding(
                     get: { settingsStore.notificationsEnabled },
                     set: { newValue in
-                        guard newValue else {
+                        switch SettingsViewLogic.notificationToggleDecision(
+                            enabling: newValue,
+                            authorizationStatus: settingsStore.notificationAuthorizationStatus
+                        ) {
+                        case .disable:
                             settingsStore.notificationsEnabled = false
-                            return
-                        }
-
-                        Task { @MainActor in
-                            switch settingsStore.notificationAuthorizationStatus {
-                            case .authorized:
-                                settingsStore.notificationsEnabled = true
-                            case .notDetermined:
+                        case .enableImmediately:
+                            settingsStore.notificationsEnabled = true
+                        case .requestSystemPermission:
+                            Task { @MainActor in
                                 let status = await NotificationManager.shared.requestPermission()
                                 settingsStore.notificationAuthorizationStatus = status
                                 settingsStore.notificationsEnabled = (status == .authorized)
                                 showNotificationSettingsHelp = (status == .denied)
-                            case .denied:
-                                settingsStore.notificationsEnabled = false
-                                showNotificationSettingsHelp = true
                             }
+                        case .showSystemSettingsHelp:
+                            settingsStore.notificationsEnabled = false
+                            showNotificationSettingsHelp = true
                         }
                     }
                 ))
 
-                if settingsStore.notificationAuthorizationStatus == .denied {
+                if SettingsViewLogic.shouldShowDeniedNotificationBanner(
+                    authorizationStatus: settingsStore.notificationAuthorizationStatus
+                ) {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.yellow)
@@ -349,7 +399,7 @@ struct ServerFormView: View {
     private var normalizedServerName: String { ServerConnection.normalizedDisplayName(from: serverName) }
     private var validatedServerURL: URL? { ServerConnection.validatedBaseURL(from: serverURL) }
     private var validatedSlug: String? { ServerConnection.validatedStatusPageSlug(from: slug) }
-    private var canSubmit: Bool { validatedServerURL != nil && validatedSlug != nil }
+    private var canSubmit: Bool { ServerFormViewLogic.canSubmit(serverURL: serverURL, slug: slug) }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -409,14 +459,12 @@ struct ServerFormView: View {
     }
 
     private func save() {
-        guard let url = validatedServerURL, let validatedSlug else { return }
-        let conn = ServerConnection(
-            id: connection?.id ?? UUID(),
-            name: normalizedServerName,
-            baseURL: url,
-            statusPageSlug: validatedSlug,
-            isDefault: connection?.isDefault ?? false
-        )
+        guard let conn = ServerFormViewLogic.draftConnection(
+            existingConnection: connection,
+            serverURL: serverURL,
+            slug: slug,
+            serverName: serverName
+        ) else { return }
         onSave(conn)
     }
 
@@ -444,5 +492,33 @@ struct ServerFormView: View {
         } catch {
             testResult = (false, error.localizedDescription)
         }
+    }
+}
+
+enum ServerFormViewLogic {
+    static func canSubmit(serverURL: String, slug: String) -> Bool {
+        ServerConnection.validatedBaseURL(from: serverURL) != nil
+            && ServerConnection.validatedStatusPageSlug(from: slug) != nil
+    }
+
+    static func draftConnection(
+        existingConnection: ServerConnection?,
+        serverURL: String,
+        slug: String,
+        serverName: String
+    ) -> ServerConnection? {
+        guard let url = ServerConnection.validatedBaseURL(from: serverURL),
+              let validatedSlug = ServerConnection.validatedStatusPageSlug(from: slug)
+        else {
+            return nil
+        }
+
+        return ServerConnection(
+            id: existingConnection?.id ?? UUID(),
+            name: ServerConnection.normalizedDisplayName(from: serverName),
+            baseURL: url,
+            statusPageSlug: validatedSlug,
+            isDefault: existingConnection?.isDefault ?? false
+        )
     }
 }

@@ -1,5 +1,42 @@
 import SwiftUI
 
+enum OnboardingViewLogic {
+    static func normalizedSlug(from rawValue: String) -> String {
+        ServerConnection.normalizedStatusPageSlug(from: rawValue)
+    }
+
+    static func normalizedServerName(from rawValue: String) -> String {
+        ServerConnection.normalizedDisplayName(from: rawValue)
+    }
+
+    static func validatedServerURL(from rawValue: String) -> URL? {
+        ServerConnection.validatedBaseURL(from: rawValue)
+    }
+
+    static func canContinue(serverURL: String, slug: String) -> Bool {
+        validatedServerURL(from: serverURL) != nil
+            && ServerConnection.validatedStatusPageSlug(from: slug) != nil
+    }
+
+    static func draftConnection(
+        serverURL: String,
+        slug: String,
+        serverName: String
+    ) -> ServerConnection? {
+        guard let url = validatedServerURL(from: serverURL),
+              let validatedSlug = ServerConnection.validatedStatusPageSlug(from: slug)
+        else {
+            return nil
+        }
+
+        return ServerConnection(
+            name: normalizedServerName(from: serverName),
+            baseURL: url,
+            statusPageSlug: validatedSlug
+        )
+    }
+}
+
 struct OnboardingView: View {
     @Bindable var settingsStore: SettingsStore
     var onComplete: () -> Void
@@ -12,19 +49,19 @@ struct OnboardingView: View {
     @State private var testResult: TestResult?
 
     private var normalizedSlug: String {
-        ServerConnection.normalizedStatusPageSlug(from: slug)
+        OnboardingViewLogic.normalizedSlug(from: slug)
     }
 
     private var normalizedServerName: String {
-        ServerConnection.normalizedDisplayName(from: serverName)
+        OnboardingViewLogic.normalizedServerName(from: serverName)
     }
 
     private var validatedServerURL: URL? {
-        ServerConnection.validatedBaseURL(from: serverURL)
+        OnboardingViewLogic.validatedServerURL(from: serverURL)
     }
 
     private var canContinue: Bool {
-        validatedServerURL != nil && ServerConnection.validatedStatusPageSlug(from: slug) != nil
+        OnboardingViewLogic.canContinue(serverURL: serverURL, slug: slug)
     }
 
     enum TestResult {
@@ -206,13 +243,12 @@ struct OnboardingView: View {
     }
 
     private func saveAndContinue() {
-        guard let url = validatedServerURL,
-              let validatedSlug = ServerConnection.validatedStatusPageSlug(from: slug) else { return }
-        settingsStore.serverConnection = ServerConnection(
-            name: normalizedServerName,
-            baseURL: url,
-            statusPageSlug: validatedSlug
-        )
+        guard let connection = OnboardingViewLogic.draftConnection(
+            serverURL: serverURL,
+            slug: slug,
+            serverName: serverName
+        ) else { return }
+        settingsStore.serverConnection = connection
         withAnimation { step = 2 }
     }
 }

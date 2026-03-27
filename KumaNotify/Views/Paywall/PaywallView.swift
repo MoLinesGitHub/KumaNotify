@@ -1,15 +1,69 @@
 import SwiftUI
 
+enum PaywallViewLogic {
+    enum PurchasePresentation: Equatable {
+        case purchased
+        case productLoadError(String)
+        case purchasing
+        case purchaseFailure(String)
+        case upgradeAvailable(isEnabled: Bool)
+    }
+
+    static func isPurchased(
+        proUnlocked: Bool,
+        effectiveProUnlocked: Bool?,
+        purchaseState: StoreManager.PurchaseState
+    ) -> Bool {
+        #if DEBUG
+        return (effectiveProUnlocked ?? proUnlocked) || purchaseState == .purchased
+        #else
+        return proUnlocked || purchaseState == .purchased
+        #endif
+    }
+
+    static func purchasePresentation(
+        isPurchased: Bool,
+        productLoadErrorMessage: String?,
+        hasProProduct: Bool,
+        purchaseState: StoreManager.PurchaseState
+    ) -> PurchasePresentation {
+        if isPurchased {
+            return .purchased
+        }
+
+        if let message = productLoadErrorMessage, !hasProProduct {
+            return .productLoadError(message)
+        }
+
+        switch purchaseState {
+        case .purchasing:
+            return .purchasing
+        case .purchased:
+            return .purchased
+        case .failed(let message):
+            return .purchaseFailure(message)
+        case .idle:
+            return .upgradeAvailable(isEnabled: hasProProduct)
+        }
+    }
+}
+
 struct PaywallView: View {
     let storeManager: StoreManager
     var onDismiss: (() -> Void)?
 
     private var isPurchased: Bool {
-        #if DEBUG
-        storeManager.effectiveProUnlocked || storeManager.purchaseState == .purchased
-        #else
-        storeManager.proUnlocked || storeManager.purchaseState == .purchased
-        #endif
+        PaywallViewLogic.isPurchased(
+            proUnlocked: storeManager.proUnlocked,
+            effectiveProUnlocked: {
+                #if DEBUG
+                storeManager.effectiveProUnlocked
+                #else
+                nil
+                #endif
+            }(),
+            purchaseState: storeManager.purchaseState
+        )
     }
 
     var body: some View {
@@ -59,12 +113,17 @@ struct PaywallView: View {
 
     private var purchaseButton: some View {
         Group {
-            if isPurchased {
+            switch PaywallViewLogic.purchasePresentation(
+                isPurchased: isPurchased,
+                productLoadErrorMessage: storeManager.productLoadErrorMessage,
+                hasProProduct: storeManager.proProduct != nil,
+                purchaseState: storeManager.purchaseState
+            ) {
+            case .purchased:
                 Label("Purchased", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                     .accessibilityIdentifier("paywall.purchasedLabel")
-            } else if let message = storeManager.productLoadErrorMessage,
-                      storeManager.proProduct == nil {
+            case .productLoadError(let message):
                 VStack(spacing: 4) {
                     Text(message)
                         .font(.caption)
@@ -75,23 +134,18 @@ struct PaywallView: View {
                     .buttonStyle(.link)
                     .font(.caption)
                 }
-            } else {
-                switch storeManager.purchaseState {
-                case .purchasing:
-                    ProgressView()
-                        .controlSize(.small)
-                case .purchased:
-                    EmptyView()
-                case .failed(let message):
-                    VStack(spacing: 4) {
-                        Text(message)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                        upgradeButton
-                    }
-                case .idle:
+            case .purchasing:
+                ProgressView()
+                    .controlSize(.small)
+            case .purchaseFailure(let message):
+                VStack(spacing: 4) {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                     upgradeButton
                 }
+            case .upgradeAvailable:
+                upgradeButton
             }
         }
     }

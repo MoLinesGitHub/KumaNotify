@@ -2271,4 +2271,191 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertTrue(WidgetDataPresentation.shouldShowSummary(for: allUp))
         XCTAssertFalse(WidgetDataPresentation.shouldShowSummary(for: offline))
     }
+
+    func testSettingsViewLogicGatesMultipleServersForFreeTier() {
+        XCTAssertTrue(SettingsViewLogic.canAddServer(isPro: false, serverCount: 0))
+        XCTAssertFalse(SettingsViewLogic.canAddServer(isPro: false, serverCount: 1))
+        XCTAssertTrue(SettingsViewLogic.canAddServer(isPro: true, serverCount: 5))
+
+        XCTAssertFalse(SettingsViewLogic.shouldShowMultiServerUpsell(isPro: false, serverCount: 0))
+        XCTAssertTrue(SettingsViewLogic.shouldShowMultiServerUpsell(isPro: false, serverCount: 1))
+        XCTAssertFalse(SettingsViewLogic.shouldShowMultiServerUpsell(isPro: true, serverCount: 3))
+    }
+
+    func testSettingsViewLogicMapsNotificationToggleFlowFromAuthorizationStatus() {
+        XCTAssertEqual(
+            SettingsViewLogic.notificationToggleDecision(
+                enabling: false,
+                authorizationStatus: .authorized
+            ),
+            .disable
+        )
+        XCTAssertEqual(
+            SettingsViewLogic.notificationToggleDecision(
+                enabling: true,
+                authorizationStatus: .authorized
+            ),
+            .enableImmediately
+        )
+        XCTAssertEqual(
+            SettingsViewLogic.notificationToggleDecision(
+                enabling: true,
+                authorizationStatus: .notDetermined
+            ),
+            .requestSystemPermission
+        )
+        XCTAssertEqual(
+            SettingsViewLogic.notificationToggleDecision(
+                enabling: true,
+                authorizationStatus: .denied
+            ),
+            .showSystemSettingsHelp
+        )
+
+        XCTAssertTrue(SettingsViewLogic.shouldShowDeniedNotificationBanner(authorizationStatus: .denied))
+        XCTAssertFalse(SettingsViewLogic.shouldShowDeniedNotificationBanner(authorizationStatus: .authorized))
+    }
+
+    func testOnboardingViewLogicBuildsNormalizedDraftConnection() {
+        let connection = OnboardingViewLogic.draftConnection(
+            serverURL: " https://status.example.com ",
+            slug: " /primary/ ",
+            serverName: "   "
+        )
+
+        XCTAssertEqual(connection?.baseURL.absoluteString, "https://status.example.com")
+        XCTAssertEqual(connection?.statusPageSlug, "primary")
+        XCTAssertEqual(connection?.name, String(localized: "My Kuma Server"))
+        XCTAssertTrue(OnboardingViewLogic.canContinue(
+            serverURL: "https://status.example.com",
+            slug: "primary"
+        ))
+        XCTAssertFalse(OnboardingViewLogic.canContinue(
+            serverURL: "notaurl",
+            slug: "primary"
+        ))
+        XCTAssertNil(OnboardingViewLogic.draftConnection(
+            serverURL: "https://status.example.com",
+            slug: "nested/path",
+            serverName: "Primary"
+        ))
+    }
+
+    func testPaywallViewLogicMapsPurchasePresentationBranches() {
+        XCTAssertEqual(
+            PaywallViewLogic.purchasePresentation(
+                isPurchased: true,
+                productLoadErrorMessage: nil,
+                hasProProduct: true,
+                purchaseState: .idle
+            ),
+            .purchased
+        )
+        XCTAssertEqual(
+            PaywallViewLogic.purchasePresentation(
+                isPurchased: false,
+                productLoadErrorMessage: "Store offline",
+                hasProProduct: false,
+                purchaseState: .idle
+            ),
+            .productLoadError("Store offline")
+        )
+        XCTAssertEqual(
+            PaywallViewLogic.purchasePresentation(
+                isPurchased: false,
+                productLoadErrorMessage: nil,
+                hasProProduct: true,
+                purchaseState: .purchasing
+            ),
+            .purchasing
+        )
+        XCTAssertEqual(
+            PaywallViewLogic.purchasePresentation(
+                isPurchased: false,
+                productLoadErrorMessage: nil,
+                hasProProduct: true,
+                purchaseState: .failed("Purchase failed")
+            ),
+            .purchaseFailure("Purchase failed")
+        )
+        XCTAssertEqual(
+            PaywallViewLogic.purchasePresentation(
+                isPurchased: false,
+                productLoadErrorMessage: nil,
+                hasProProduct: false,
+                purchaseState: .idle
+            ),
+            .upgradeAvailable(isEnabled: false)
+        )
+    }
+
+    func testDashboardViewLogicMapsSurfaceAndSectionVisibility() {
+        XCTAssertEqual(
+            DashboardViewLogic.currentSurface(showPaywall: true, showIncidentHistory: true),
+            .paywall
+        )
+        XCTAssertEqual(
+            DashboardViewLogic.currentSurface(showPaywall: false, showIncidentHistory: true),
+            .incidentHistory
+        )
+        XCTAssertEqual(
+            DashboardViewLogic.currentSurface(showPaywall: false, showIncidentHistory: false),
+            .mainContent
+        )
+
+        XCTAssertFalse(DashboardViewLogic.shouldShowServerSelector(connectionCount: 1))
+        XCTAssertTrue(DashboardViewLogic.shouldShowServerSelector(connectionCount: 2))
+        XCTAssertFalse(DashboardViewLogic.shouldShowFilterBar(isPro: false))
+        XCTAssertTrue(DashboardViewLogic.shouldShowFilterBar(isPro: true))
+        XCTAssertFalse(DashboardViewLogic.shouldShowMaintenanceBanner(isPro: false, maintenanceCount: 2))
+        XCTAssertFalse(DashboardViewLogic.shouldShowMaintenanceBanner(isPro: true, maintenanceCount: 0))
+        XCTAssertTrue(DashboardViewLogic.shouldShowMaintenanceBanner(isPro: true, maintenanceCount: 1))
+    }
+
+    func testServerFormViewLogicBuildsDraftForEditAndCreateFlows() {
+        let existing = ServerConnection(
+            id: UUID(),
+            name: "Existing",
+            baseURL: URL(string: "https://old.example.com")!,
+            statusPageSlug: "old",
+            isDefault: true
+        )
+
+        let edited = ServerFormViewLogic.draftConnection(
+            existingConnection: existing,
+            serverURL: " https://new.example.com ",
+            slug: " /prod/ ",
+            serverName: "   "
+        )
+        let created = ServerFormViewLogic.draftConnection(
+            existingConnection: nil,
+            serverURL: "https://new.example.com",
+            slug: "prod",
+            serverName: "Primary"
+        )
+
+        XCTAssertTrue(ServerFormViewLogic.canSubmit(
+            serverURL: "https://new.example.com",
+            slug: "prod"
+        ))
+        XCTAssertFalse(ServerFormViewLogic.canSubmit(
+            serverURL: "notaurl",
+            slug: "prod"
+        ))
+
+        XCTAssertEqual(edited?.id, existing.id)
+        XCTAssertEqual(edited?.isDefault, true)
+        XCTAssertEqual(edited?.baseURL.absoluteString, "https://new.example.com")
+        XCTAssertEqual(edited?.statusPageSlug, "prod")
+        XCTAssertEqual(edited?.name, String(localized: "My Kuma Server"))
+
+        XCTAssertEqual(created?.name, "Primary")
+        XCTAssertEqual(created?.isDefault, false)
+        XCTAssertNil(ServerFormViewLogic.draftConnection(
+            existingConnection: nil,
+            serverURL: "https://new.example.com",
+            slug: "nested/path",
+            serverName: "Primary"
+        ))
+    }
 }
