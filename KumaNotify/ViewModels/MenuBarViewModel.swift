@@ -6,6 +6,7 @@ import WidgetKit
 final class MenuBarViewModel {
     private let settingsStore: SettingsStore
     let pollingEngine: PollingEngine
+    private let serviceFactory: (MonitoringProvider) -> any MonitoringServiceProtocol
     private let networkMonitor: NetworkMonitor
     private let persistence: PersistenceManager?
     private let storeManager: StoreManager?
@@ -41,6 +42,7 @@ final class MenuBarViewModel {
     init(
         settingsStore: SettingsStore,
         pollingEngine: PollingEngine,
+        serviceFactory: @escaping (MonitoringProvider) -> any MonitoringServiceProtocol = MonitoringServiceFactory.create,
         networkMonitor: NetworkMonitor = NetworkMonitor(),
         persistence: PersistenceManager? = nil,
         storeManager: StoreManager? = nil,
@@ -53,6 +55,7 @@ final class MenuBarViewModel {
     ) {
         self.settingsStore = settingsStore
         self.pollingEngine = pollingEngine
+        self.serviceFactory = serviceFactory
         self.networkMonitor = networkMonitor
         self.persistence = persistence
         self.storeManager = storeManager
@@ -115,11 +118,12 @@ final class MenuBarViewModel {
         var allUp = 0
         var allTotal = 0
         var allDown = 0
+        var failedConnections = 0
         var anyError: String?
         var degradedReason: OverallStatus.DegradedReason?
 
         for connection in connections {
-            let service = MonitoringServiceFactory.create(for: connection.provider)
+            let service = serviceFactory(connection.provider)
             do {
                 let result = try await service.fetchStatusPage(connection: connection)
                 let monitors = result.groups.flatMap(\.monitors)
@@ -141,6 +145,7 @@ final class MenuBarViewModel {
                     degradedReason = findDegradedReason(monitors: monitors)
                 }
             } catch {
+                failedConnections += 1
                 anyError = error.localizedDescription
             }
         }
@@ -148,9 +153,13 @@ final class MenuBarViewModel {
         upCount = allUp
         totalCount = allTotal
         lastCheckTime = Date()
-        hasActiveIncident = allDown > 0
+        hasActiveIncident = allDown > 0 || failedConnections > 0
 
-        if allTotal == 0, let anyError {
+        if failedConnections > 0 {
+            errorMessage = anyError ?? String(localized: "One or more servers are unreachable")
+            overallStatus = .unreachable
+            pollingEngine.reportFailure()
+        } else if allTotal == 0, let anyError {
             errorMessage = anyError
             overallStatus = .unreachable
             pollingEngine.reportFailure()
@@ -177,7 +186,7 @@ final class MenuBarViewModel {
             downCount: downCount,
             overallStatusRaw: overallStatus.widgetKey,
             lastCheckTime: lastCheckTime,
-            serverName: settingsStore.serverConnection?.name,
+            serverName: settingsStore.serverConnections.count == 1 ? settingsStore.serverConnection?.name : nil,
             hasActiveIncident: hasActiveIncident
         )
         if let defaults = widgetDefaults {

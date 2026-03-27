@@ -190,6 +190,7 @@ struct DashboardView: View {
                     await menuBarVM.refresh()
                 }
             }
+            .accessibilityIdentifier("dashboard.refreshButton")
             .opacity(menuBarVM.pollingEngine.isPolling ? 0.3 : 1)
 
             toolbarIcon("clock.arrow.circlepath", label: String(localized: "Incident History")) {
@@ -200,6 +201,7 @@ struct DashboardView: View {
                     showPaywall = true
                 }
             }
+            .accessibilityIdentifier("dashboard.incidentHistoryButton")
 
             toolbarIcon("doc.on.doc", label: String(localized: "Copy Summary")) {
                 dashboardVM.copySummary()
@@ -242,6 +244,7 @@ struct DashboardView: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
+            .accessibilityIdentifier("dashboard.moreOptionsButton")
             .accessibilityLabel(String(localized: "More Options"))
         }
         .padding(.horizontal, 12)

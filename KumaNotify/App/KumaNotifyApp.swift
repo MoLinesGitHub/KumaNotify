@@ -5,6 +5,7 @@ import os
 @MainActor
 @main
 struct KumaNotifyApp: App {
+    private let uiTestShowsOnboarding: Bool
     @State private var settingsStore: SettingsStore
     @State private var pollingEngine: PollingEngine
     @State private var persistence: PersistenceManager?
@@ -16,6 +17,13 @@ struct KumaNotifyApp: App {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
+        menuBarScene
+        settingsScene
+        onboardingScene
+    }
+
+    @SceneBuilder
+    private var menuBarScene: some Scene {
         MenuBarExtra {
             if let menuBarVM, let dashboardVM {
                 DashboardView(
@@ -51,13 +59,19 @@ struct KumaNotifyApp: App {
         .onChange(of: settingsStore.pollingInterval) {
             menuBarVM?.refreshPollingInterval()
         }
+    }
 
+    @SceneBuilder
+    private var settingsScene: some Scene {
         Settings {
             SettingsView(settingsStore: settingsStore, storeManager: storeManager) {
                 setupViewModels()
             }
         }
+    }
 
+    @SceneBuilder
+    private var onboardingScene: some Scene {
         Window("Welcome to Kuma Notify", id: "onboarding") {
             OnboardingView(settingsStore: settingsStore) {
                 showOnboarding = false
@@ -70,7 +84,11 @@ struct KumaNotifyApp: App {
     }
 
     init() {
-        let store = SettingsStore(suiteName: AppConstants.appGroupId)
+        let environment = ProcessInfo.processInfo.environment
+        let settingsSuiteName = environment["KUMA_SETTINGS_SUITE_NAME"] ?? AppConstants.appGroupId
+        self.uiTestShowsOnboarding = environment["KUMA_UI_TEST_SHOW_ONBOARDING"] == "1"
+
+        let store = SettingsStore(suiteName: settingsSuiteName)
         let engine = PollingEngine()
         let sm = StoreManager()
         _settingsStore = State(initialValue: store)
@@ -99,6 +117,12 @@ struct KumaNotifyApp: App {
             ))
         } else {
             _showOnboarding = State(initialValue: !store.hasCompletedOnboarding)
+        }
+
+        if uiTestShowsOnboarding {
+            Task { @MainActor in
+                UITestOnboardingWindow.show(settingsStore: store)
+            }
         }
     }
 
@@ -137,5 +161,32 @@ struct KumaNotifyApp: App {
         }
 
         mbVM.startPolling()
+    }
+}
+
+@MainActor
+private enum UITestOnboardingWindow {
+    private static var window: NSWindow?
+
+    static func show(settingsStore: SettingsStore) {
+        let hostingView = NSHostingView(
+            rootView: OnboardingView(settingsStore: settingsStore) { }
+                .frame(width: 440, height: 360)
+        )
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 360),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Onboarding UI Tests"
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.contentView = hostingView
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        self.window = window
     }
 }

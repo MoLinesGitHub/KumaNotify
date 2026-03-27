@@ -1059,6 +1059,16 @@
         }
       }
     },
+    "One or more servers are unreachable" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uno o más servidores no son accesibles"
+          }
+        }
+      }
+    },
     "No servers configured" : {
       "localizations" : {
         "es" : {

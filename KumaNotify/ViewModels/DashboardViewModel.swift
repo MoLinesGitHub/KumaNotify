@@ -76,6 +76,11 @@ final class DashboardViewModel {
             loadPreferences()
             loadLastIncidentDate()
         } catch {
+            groups = []
+            heartbeats = [:]
+            incidents = []
+            maintenances = []
+            lastFetchTime = nil
             errorMessage = error.localizedDescription
         }
     }
@@ -251,6 +256,11 @@ final class DashboardViewModel {
 
     private func recomputeSummary() {
         let allMonitors = groups.flatMap(\.monitors)
+        guard !allMonitors.isEmpty else {
+            summaryText = String(localized: "No data")
+            return
+        }
+
         let up = allMonitors.filter { $0.currentStatus == .up }.count
         let total = allMonitors.count
         let timeAgo: String
@@ -258,7 +268,7 @@ final class DashboardViewModel {
         if let lastFetchTime {
             timeAgo = lastFetchTime.formatted(.relative(presentation: .numeric))
         } else {
-            timeAgo = String(localized: "never")
+            timeAgo = String(localized: "No data")
         }
 
         summaryText = String.localizedStringWithFormat(

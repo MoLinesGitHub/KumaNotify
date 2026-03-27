@@ -45,6 +45,36 @@ final class KumaNotifyTests: XCTestCase {
         }
     }
 
+    struct ScriptedMonitoringService: MonitoringServiceProtocol {
+        let fetchStatusPageHandler: @Sendable (ServerConnection) async throws -> StatusPageResult
+        let fetchHeartbeatsHandler: @Sendable (ServerConnection) async throws -> HeartbeatResult
+        let validateConnectionHandler: @Sendable (ServerConnection) async throws -> Bool
+
+        init(
+            fetchStatusPageHandler: @escaping @Sendable (ServerConnection) async throws -> StatusPageResult,
+            fetchHeartbeatsHandler: @escaping @Sendable (ServerConnection) async throws -> HeartbeatResult = { _ in
+                HeartbeatResult(heartbeats: [:], uptimes: [:])
+            },
+            validateConnectionHandler: @escaping @Sendable (ServerConnection) async throws -> Bool = { _ in true }
+        ) {
+            self.fetchStatusPageHandler = fetchStatusPageHandler
+            self.fetchHeartbeatsHandler = fetchHeartbeatsHandler
+            self.validateConnectionHandler = validateConnectionHandler
+        }
+
+        func fetchStatusPage(connection: ServerConnection) async throws -> StatusPageResult {
+            try await fetchStatusPageHandler(connection)
+        }
+
+        func fetchHeartbeats(connection: ServerConnection) async throws -> HeartbeatResult {
+            try await fetchHeartbeatsHandler(connection)
+        }
+
+        func validateConnection(_ connection: ServerConnection) async throws -> Bool {
+            try await validateConnectionHandler(connection)
+        }
+    }
+
     func testMonitorStatusRawValues() {
         XCTAssertEqual(MonitorStatus.up.rawValue, 1)
         XCTAssertEqual(MonitorStatus.down.rawValue, 0)
@@ -277,6 +307,85 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(reloadCount, 1)
     }
 
+    @MainActor
+    func testMenuBarViewModelMarksAggregateStatusUnreachableWhenAnyServerFails() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let primary = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let secondary = ServerConnection(
+            name: "Secondary",
+            baseURL: URL(string: "https://secondary.example.com")!,
+            statusPageSlug: "secondary",
+            isDefault: false
+        )
+        store.addConnection(primary)
+        store.addConnection(secondary)
+
+        let widgetSuiteName = "KumaNotifyTests.widget.aggregate.\(UUID().uuidString)"
+        let widgetDefaults = UserDefaults(suiteName: widgetSuiteName)!
+        UserDefaults.standard.removePersistentDomain(forName: widgetSuiteName)
+        defer { UserDefaults.standard.removePersistentDomain(forName: widgetSuiteName) }
+
+        let monitor = UnifiedMonitor(
+            id: "api",
+            name: "API",
+            type: "http",
+            currentStatus: .up,
+            latestPing: 90,
+            uptime24h: 1,
+            uptime7d: 1,
+            uptime30d: 1,
+            certExpiryDays: nil,
+            validCert: nil,
+            url: nil,
+            lastStatusChange: nil
+        )
+        let result = StatusPageResult(
+            title: "Primary",
+            groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: [monitor])],
+            heartbeats: [:],
+            incidents: [],
+            maintenances: [],
+            showCertExpiry: false
+        )
+        let service = ScriptedMonitoringService { connection in
+            if connection.id == primary.id {
+                return result
+            }
+            throw APIError.serverUnreachable
+        }
+
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            widgetDefaults: widgetDefaults,
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+
+        XCTAssertEqual(viewModel.errorMessage, String(localized: "Server unreachable"))
+        if case .unreachable = viewModel.overallStatus {
+            XCTAssertTrue(true)
+        } else {
+            XCTFail("Expected aggregate status to be unreachable when one server fails")
+        }
+
+        let widgetData = WidgetData.read(from: widgetDefaults)
+        XCTAssertNil(widgetData?.serverName)
+        XCTAssertEqual(widgetData?.overallStatusRaw, "unreachable")
+    }
+
     func testIntentStatusFormatterBuildsLocalizedSummaries() {
         let data = WidgetData(
             upCount: 3,
@@ -453,6 +562,72 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(counts.statusPage, 1)
         XCTAssertEqual(counts.heartbeat, 0)
         XCTAssertEqual(viewModel.heartbeats["api"]?.count, 1)
+    }
+
+    @MainActor
+    func testDashboardViewModelClearsStaleDataWhenRefreshFails() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let viewModel = DashboardViewModel(
+            connection: connection,
+            settingsStore: store,
+            serviceFactory: { _ in
+                ScriptedMonitoringService { _ in
+                    throw APIError.serverUnreachable
+                }
+            }
+        )
+
+        viewModel.groups = [
+            UnifiedGroup(
+                id: "g1",
+                name: "Core",
+                weight: 0,
+                monitors: [
+                    UnifiedMonitor(
+                        id: "api",
+                        name: "API",
+                        type: "http",
+                        currentStatus: .up,
+                        latestPing: 120,
+                        uptime24h: 1,
+                        uptime7d: 1,
+                        uptime30d: 1,
+                        certExpiryDays: nil,
+                        validCert: nil,
+                        url: nil,
+                        lastStatusChange: nil
+                    )
+                ]
+            )
+        ]
+        viewModel.heartbeats = ["api": []]
+        viewModel.incidents = [
+            UKIncident(
+                id: nil,
+                title: "Outage",
+                content: nil,
+                style: "danger",
+                createdDate: nil,
+                lastUpdatedDate: nil
+            )
+        ]
+        viewModel.maintenances = [UnifiedMaintenance(id: "m1", title: "Maintenance", description: nil, startDate: nil, endDate: nil)]
+
+        await viewModel.fetchData()
+
+        XCTAssertTrue(viewModel.groups.isEmpty)
+        XCTAssertTrue(viewModel.heartbeats.isEmpty)
+        XCTAssertTrue(viewModel.incidents.isEmpty)
+        XCTAssertTrue(viewModel.maintenances.isEmpty)
+        XCTAssertEqual(viewModel.summaryText, String(localized: "No data"))
+        XCTAssertEqual(viewModel.errorMessage, String(localized: "Server unreachable"))
     }
 
     func testNotificationIdentifiersAreNamespacedByServerConnection() {

@@ -71,6 +71,7 @@ targets:
     scheme:
       testTargets:
         - KumaNotifyTests
+        - KumaNotifyUITests
 
   KumaNotifyWidget:
     type: app-extension
@@ -104,4 +105,16 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.tests
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Kuma Notify.app/Contents/MacOS/Kuma Notify"
         BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: YES
+
+  KumaNotifyUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: KumaNotifyUITests
+    dependencies:
+      - target: KumaNotify
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.uitests
         GENERATE_INFOPLIST_FILE: YES

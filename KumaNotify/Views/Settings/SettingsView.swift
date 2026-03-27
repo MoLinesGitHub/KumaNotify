@@ -70,6 +70,7 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(!isPro && settingsStore.serverConnections.count >= 1)
+                    .accessibilityIdentifier("settings.addServerButton")
 
                     if !isPro && !settingsStore.serverConnections.isEmpty {
                         Text("Pro required for multiple servers")
@@ -273,10 +274,13 @@ struct ServerFormView: View {
             Form {
                 TextField("Server URL", text: $serverURL, prompt: Text("http://192.168.1.100:3001"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("settings.serverURLField")
                 TextField("Status Page Slug", text: $slug, prompt: Text("e.g. cortes"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("settings.statusPageSlugField")
                 TextField("Display Name", text: $serverName, prompt: Text("My Kuma Server"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("settings.displayNameField")
             }
 
             HStack {
@@ -284,6 +288,7 @@ struct ServerFormView: View {
                     Task { await testConnection() }
                 }
                 .disabled(serverURL.isEmpty || slug.isEmpty || isTesting)
+                .accessibilityIdentifier("settings.testConnectionButton")
 
                 if let testResult {
                     Label(
@@ -298,11 +303,13 @@ struct ServerFormView: View {
 
                 Button("Cancel") { onCancel() }
                     .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("settings.cancelButton")
 
                 Button("Save") { save() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(serverURL.isEmpty || slug.isEmpty)
+                    .accessibilityIdentifier("settings.saveButton")
             }
         }
         .padding(20)

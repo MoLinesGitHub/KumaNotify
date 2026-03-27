@@ -7,7 +7,7 @@ struct OnboardingView: View {
     @State private var step = 0
     @State private var serverURL = ""
     @State private var slug = ""
-    @State private var serverName = "My Kuma Server"
+    @State private var serverName = String(localized: "My Kuma Server")
     @State private var isTesting = false
     @State private var testResult: TestResult?
 
@@ -50,6 +50,7 @@ struct OnboardingView: View {
 
             Text("Welcome to Kuma Notify")
                 .font(.title.bold())
+                .accessibilityIdentifier("onboarding.welcomeTitle")
 
             Text("Monitor your services directly from the menu bar.\nGet instant notifications when something goes down.")
                 .multilineTextAlignment(.center)
@@ -63,6 +64,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .accessibilityIdentifier("onboarding.getStartedButton")
             .padding(.bottom, 30)
         }
     }
@@ -78,10 +80,13 @@ struct OnboardingView: View {
             Form {
                 TextField("Server URL", text: $serverURL, prompt: Text("http://192.168.1.100:3001"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("onboarding.serverURLField")
                 TextField("Status Page Slug", text: $slug, prompt: Text("e.g. cortes"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("onboarding.statusPageSlugField")
                 TextField("Display Name", text: $serverName)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("onboarding.displayNameField")
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
@@ -103,6 +108,7 @@ struct OnboardingView: View {
                 Button("Back") {
                     withAnimation { step = 0 }
                 }
+                .accessibilityIdentifier("onboarding.backButton")
 
                 Spacer()
 
@@ -110,12 +116,14 @@ struct OnboardingView: View {
                     Task { await testConnection() }
                 }
                 .disabled(serverURL.isEmpty || slug.isEmpty || isTesting)
+                .accessibilityIdentifier("onboarding.testConnectionButton")
 
                 Button("Next") {
                     saveAndContinue()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(serverURL.isEmpty || slug.isEmpty)
+                .accessibilityIdentifier("onboarding.nextButton")
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
@@ -146,6 +154,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .accessibilityIdentifier("onboarding.startMonitoringButton")
             .padding(.bottom, 30)
         }
     }
@@ -154,7 +163,7 @@ struct OnboardingView: View {
 
     private func testConnection() async {
         guard let url = URL(string: serverURL) else {
-            testResult = .failure("Invalid URL")
+            testResult = .failure(String(localized: "Invalid URL"))
             return
         }
 
