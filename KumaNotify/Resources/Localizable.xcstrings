@@ -1718,12 +1718,12 @@
         }
       }
     },
-    "If several monitors go down in a row, only the first down alert will play sound during this cooldown window." : {
+    "Only the first down alert plays sound during this window." : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Si varios monitores se caen seguidos, solo la primera alerta de caída reproducirá sonido durante esta ventana de cooldown."
+            "value" : "Solo la primera alerta de caída reproduce sonido durante esta ventana."
           }
         }
       }
