@@ -242,7 +242,8 @@ final class MenuBarViewModel {
             overallStatusRaw: overallStatus.widgetKey,
             lastCheckTime: lastCheckTime,
             serverName: settingsStore.serverConnections.count == 1 ? settingsStore.serverConnection?.name : nil,
-            hasActiveIncident: hasActiveIncident
+            hasActiveIncident: hasActiveIncident,
+            activeIncidentCount: downCount > 0 ? downCount : (hasActiveIncident ? 1 : 0)
         )
         if let defaults = widgetDefaults {
             data.write(to: defaults)

@@ -25,6 +25,39 @@ enum WidgetDataPresentation {
         default: String(localized: "Offline")
         }
     }
+
+    static func criticalEventCount(for data: WidgetData) -> Int {
+        if data.downCount > 0 {
+            return data.downCount
+        }
+        if data.activeIncidentCount > 0 {
+            return data.activeIncidentCount
+        }
+        return data.hasActiveIncident ? 1 : 0
+    }
+
+    static func watchStatusLabel(for data: WidgetData) -> String {
+        if data.overallStatusRaw == "someDown" {
+            return statusLabel(for: data)
+        }
+
+        let incidentCount = criticalEventCount(for: data)
+        if data.hasActiveIncident && incidentCount > 0 {
+            return String.localizedStringWithFormat(
+                String(localized: "%lld incidents"),
+                Int64(incidentCount)
+            )
+        }
+
+        return statusLabel(for: data)
+    }
+
+    static func watchStatusColorKey(for data: WidgetData) -> String {
+        if data.overallStatusRaw == "someDown" || data.hasActiveIncident {
+            return "red"
+        }
+        return statusColorKey(for: data.overallStatusRaw)
+    }
 }
 
 enum WidgetTimelineSupport {
@@ -48,8 +81,52 @@ struct WidgetData: Codable {
     let lastCheckTime: Date?
     let serverName: String?
     let hasActiveIncident: Bool
+    let activeIncidentCount: Int
 
     static let userDefaultsKey = "widgetData"
+
+    init(
+        upCount: Int,
+        totalCount: Int,
+        downCount: Int,
+        overallStatusRaw: String,
+        lastCheckTime: Date?,
+        serverName: String?,
+        hasActiveIncident: Bool,
+        activeIncidentCount: Int = 0
+    ) {
+        self.upCount = upCount
+        self.totalCount = totalCount
+        self.downCount = downCount
+        self.overallStatusRaw = overallStatusRaw
+        self.lastCheckTime = lastCheckTime
+        self.serverName = serverName
+        self.hasActiveIncident = hasActiveIncident
+        self.activeIncidentCount = activeIncidentCount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case upCount
+        case totalCount
+        case downCount
+        case overallStatusRaw
+        case lastCheckTime
+        case serverName
+        case hasActiveIncident
+        case activeIncidentCount
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        upCount = try container.decode(Int.self, forKey: .upCount)
+        totalCount = try container.decode(Int.self, forKey: .totalCount)
+        downCount = try container.decode(Int.self, forKey: .downCount)
+        overallStatusRaw = try container.decode(String.self, forKey: .overallStatusRaw)
+        lastCheckTime = try container.decodeIfPresent(Date.self, forKey: .lastCheckTime)
+        serverName = try container.decodeIfPresent(String.self, forKey: .serverName)
+        hasActiveIncident = try container.decode(Bool.self, forKey: .hasActiveIncident)
+        activeIncidentCount = try container.decodeIfPresent(Int.self, forKey: .activeIncidentCount) ?? 0
+    }
 
     static func read(from defaults: UserDefaults) -> WidgetData? {
         guard let data = defaults.data(forKey: Self.userDefaultsKey) else { return nil }
@@ -86,6 +163,7 @@ struct WidgetData: Codable {
             overallStatusRaw,
             serverName ?? "",
             hasActiveIncident ? "1" : "0",
+            String(activeIncidentCount),
             lastCheckTime.map {
                 String(Int($0.timeIntervalSince1970 / Self.freshnessReloadInterval))
             } ?? ""

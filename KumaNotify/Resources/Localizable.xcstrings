@@ -136,6 +136,47 @@
         }
       }
     },
+    "%lld incidents" : {
+      "comment" : "Widget label showing the count of active incidents.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld incident"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld incidents"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld incidente"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld incidentes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld monitors down" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -997,6 +1038,108 @@
         }
       }
     },
+    "Certificate" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificado"
+          }
+        }
+      }
+    },
+    "Certificate expires" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caducidad del certificado"
+          }
+        }
+      }
+    },
+    "Expires in %lld days" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Caduca en %lld día"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Caduca en %lld días"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Invalid" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inválido"
+          }
+        }
+      }
+    },
+    "Last change" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Último cambio"
+          }
+        }
+      }
+    },
+    "Latest heartbeat" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Último heartbeat"
+          }
+        }
+      }
+    },
+    "No heartbeat yet" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todavía no hay heartbeat"
+          }
+        }
+      }
+    },
+    "Open URL" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir URL"
+          }
+        }
+      }
+    },
+    "Open app" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir app"
+          }
+        }
+      }
+    },
     "Menu Bar Icon" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1135,6 +1278,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sin datos"
+          }
+        }
+      }
+    },
+    "No heartbeat yet" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todavía no hay heartbeat"
           }
         }
       }
@@ -1449,6 +1602,16 @@
         }
       }
     },
+    "Recent incidents" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incidentes recientes"
+          }
+        }
+      }
+    },
     "Remove" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1489,6 +1652,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restaurar compra"
+          }
+        }
+      }
+    },
+    "Incident" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incidente"
           }
         }
       }
@@ -1772,6 +1945,16 @@
         }
       }
     },
+    "Status" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estado"
+          }
+        }
+      }
+    },
     "Style" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1794,6 +1977,16 @@
         }
       }
     },
+    "Time" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hora"
+          }
+        }
+      }
+    },
     "Warning Beacon" : {
       "localizations" : {
         "es" : {
@@ -1811,6 +2004,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Probar conexión"
+          }
+        }
+      }
+    },
+    "Type" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tipo"
           }
         }
       }
@@ -1921,6 +2124,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activo"
+          }
+        }
+      }
+    },
+    "Valid" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Válido"
           }
         }
       }

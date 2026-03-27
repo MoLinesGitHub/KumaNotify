@@ -4,6 +4,7 @@ struct WatchRootView: View {
     @Bindable var configurationStore: WatchConfigurationStore
     @Bindable var viewModel: WatchDashboardViewModel
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isShowingSettings = false
 
     var body: some View {
@@ -19,6 +20,16 @@ struct WatchRootView: View {
                 }
             }
             .navigationTitle(String(localized: "Server"))
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active,
+                  let connection = configurationStore.connection,
+                  !isShowingSettings
+            else { return }
+
+            Task {
+                await viewModel.refresh(connection: connection)
+            }
         }
     }
 
@@ -71,13 +82,65 @@ struct WatchRootView: View {
             if !viewModel.monitors.isEmpty {
                 Section {
                     ForEach(viewModel.monitors.prefix(12)) { monitor in
-                        HStack(spacing: 8) {
-                            Image(systemName: monitor.currentStatus.sfSymbol)
-                                .foregroundStyle(monitor.currentStatus.color)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(monitor.name)
-                                    .lineLimit(1)
-                                Text(monitor.currentStatus.label)
+                        NavigationLink {
+                            WatchMonitorDetailView(
+                                monitor: monitor,
+                                latestHeartbeat: viewModel.latestHeartbeat(for: monitor.id)
+                            )
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: monitor.currentStatus.sfSymbol)
+                                    .foregroundStyle(monitor.currentStatus.color)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(monitor.name)
+                                        .lineLimit(1)
+                                    Text(monitor.currentStatus.label)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !viewModel.maintenances.isEmpty {
+                Section(String(localized: "Maintenance")) {
+                    ForEach(viewModel.maintenances.prefix(3)) { maintenance in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(maintenance.title)
+                                .lineLimit(2)
+                            if let startDate = maintenance.startDate {
+                                Text(startDate, format: .relative(presentation: .named))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !viewModel.recentIncidents.isEmpty {
+                Section(String(localized: "Recent incidents")) {
+                    ForEach(viewModel.recentIncidents.prefix(3)) { incident in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Circle()
+                                    .fill(incident.color)
+                                    .frame(width: 6, height: 6)
+                                Text(incident.title)
+                                    .lineLimit(2)
+                            }
+
+                            if let detail = incident.detail, !detail.isEmpty {
+                                Text(detail)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+
+                            if let date = incident.date {
+                                Text(date, format: .relative(presentation: .named))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }

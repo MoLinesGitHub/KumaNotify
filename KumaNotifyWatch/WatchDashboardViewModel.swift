@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SwiftUI
+import WidgetKit
 
 struct WatchStatusSummary {
     let label: String
@@ -10,18 +11,44 @@ struct WatchStatusSummary {
     let downCount: Int
 }
 
+struct WatchIncidentSummary: Identifiable {
+    let id: String
+    let title: String
+    let detail: String?
+    let date: Date?
+    let color: Color
+}
+
 @Observable
 @MainActor
 final class WatchDashboardViewModel {
     private let service: any MonitoringServiceProtocol
+    private let widgetDefaults: UserDefaults?
+    private let reloadWidgets: () -> Void
+    private static let timestampFormatterLock = NSLock()
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
 
     var isLoading = false
     var errorMessage: String?
     var result: StatusPageResult?
     var lastRefreshDate: Date?
 
-    init(service: any MonitoringServiceProtocol = UptimeKumaService()) {
+    init(
+        service: any MonitoringServiceProtocol = UptimeKumaService(),
+        widgetDefaults: UserDefaults? = UserDefaults(suiteName: AppConstants.appGroupId),
+        reloadWidgets: @escaping () -> Void = {
+            WidgetCenter.shared.reloadTimelines(ofKind: AppConstants.watchWidgetKind)
+        }
+    ) {
         self.service = service
+        self.widgetDefaults = widgetDefaults
+        self.reloadWidgets = reloadWidgets
     }
 
     var monitors: [UnifiedMonitor] {
@@ -84,6 +111,51 @@ final class WatchDashboardViewModel {
         )
     }
 
+    var maintenances: [UnifiedMaintenance] {
+        guard let result else { return [] }
+        return result.maintenances.sorted { lhs, rhs in
+            switch (lhs.startDate, rhs.startDate) {
+            case let (lhsDate?, rhsDate?):
+                return lhsDate < rhsDate
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+        }
+    }
+
+    var recentIncidents: [WatchIncidentSummary] {
+        guard let result else { return [] }
+        return result.incidents.enumerated().map { index, incident in
+            let date = incident.lastUpdatedDate.flatMap(parseTimestamp(_:))
+                ?? incident.createdDate.flatMap(parseTimestamp(_:))
+            return WatchIncidentSummary(
+                id: incident.id.map(String.init) ?? "incident-\(index)",
+                title: incident.title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                    ? incident.title!
+                    : String(localized: "Incident"),
+                detail: incident.content?.trimmingCharacters(in: .whitespacesAndNewlines),
+                date: date,
+                color: incidentColor(style: incident.style)
+            )
+        }
+        .sorted { lhs, rhs in
+            switch (lhs.date, rhs.date) {
+            case let (lhsDate?, rhsDate?):
+                return lhsDate > rhsDate
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+        }
+    }
+
     func refresh(connection: ServerConnection) async {
         isLoading = true
         errorMessage = nil
@@ -91,9 +163,12 @@ final class WatchDashboardViewModel {
         do {
             result = try await service.fetchStatusPage(connection: connection)
             lastRefreshDate = .now
+            publishWidgetSnapshot(connection: connection)
         } catch {
             result = nil
             errorMessage = error.localizedDescription
+            lastRefreshDate = .now
+            publishOfflineWidgetSnapshot(connection: connection)
         }
 
         isLoading = false
@@ -103,6 +178,14 @@ final class WatchDashboardViewModel {
         result = nil
         errorMessage = nil
         lastRefreshDate = nil
+        if let widgetDefaults {
+            WidgetData.clear(from: widgetDefaults)
+            reloadWidgets()
+        }
+    }
+
+    func latestHeartbeat(for monitorID: String) -> UnifiedHeartbeat? {
+        result?.heartbeats[monitorID]?.max(by: { $0.time < $1.time })
     }
 
     private func isDegraded(monitors: [UnifiedMonitor]) -> Bool {
@@ -127,5 +210,72 @@ final class WatchDashboardViewModel {
         case .maintenance: 2
         case .up: 3
         }
+    }
+
+    private func incidentColor(style: String?) -> Color {
+        switch style?.lowercased() {
+        case "danger", "critical":
+            .appStatusDown
+        case "warning":
+            .appStatusDegraded
+        default:
+            .appStatusOffline
+        }
+    }
+
+    private func parseTimestamp(_ value: String) -> Date? {
+        Self.timestampFormatterLock.lock()
+        defer { Self.timestampFormatterLock.unlock() }
+        return Self.timestampFormatter.date(from: value)
+    }
+
+    private func publishWidgetSnapshot(connection: ServerConnection) {
+        guard let widgetDefaults, let result else { return }
+
+        let monitors = result.groups.flatMap(\.monitors)
+        let upCount = monitors.filter { $0.currentStatus == .up }.count
+        let downCount = monitors.filter { $0.currentStatus == .down }.count
+        let totalCount = monitors.count
+
+        let overallStatusRaw: String
+        if totalCount == 0 {
+            overallStatusRaw = "unreachable"
+        } else if downCount > 0 {
+            overallStatusRaw = "someDown"
+        } else if isDegraded(monitors: monitors) {
+            overallStatusRaw = "degraded"
+        } else {
+            overallStatusRaw = "allUp"
+        }
+
+        WidgetData(
+            upCount: upCount,
+            totalCount: totalCount,
+            downCount: downCount,
+            overallStatusRaw: overallStatusRaw,
+            lastCheckTime: lastRefreshDate,
+            serverName: result.title.isEmpty ? connection.name : result.title,
+            hasActiveIncident: downCount > 0 || !result.incidents.isEmpty,
+            activeIncidentCount: result.incidents.count
+        ).write(to: widgetDefaults)
+
+        reloadWidgets()
+    }
+
+    private func publishOfflineWidgetSnapshot(connection: ServerConnection) {
+        guard let widgetDefaults else { return }
+
+        WidgetData(
+            upCount: 0,
+            totalCount: 0,
+            downCount: 0,
+            overallStatusRaw: "unreachable",
+            lastCheckTime: lastRefreshDate,
+            serverName: connection.name,
+            hasActiveIncident: false,
+            activeIncidentCount: 0
+        ).write(to: widgetDefaults)
+
+        reloadWidgets()
     }
 }

@@ -8,9 +8,9 @@ final class WatchConfigurationStore {
 
     var connection: ServerConnection?
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        self.connection = Self.readConnection(from: defaults)
+    init(defaults: UserDefaults? = UserDefaults(suiteName: AppConstants.appGroupId)) {
+        self.defaults = defaults ?? .standard
+        self.connection = Self.readConnection(from: self.defaults)
     }
 
     func draftConnection(

@@ -5,6 +5,7 @@ enum AppConstants {
     static let watchConnectionDefaultsKey = "watchServerConnection"
     static let proProductId = "com.molinesdesigns.kumanotify.pro"
     static let widgetKind = "com.molinesdesigns.kumanotify.widget"
+    static let watchWidgetKind = "com.molinesdesigns.kumanotify.watch.widget"
     static let defaultPollingInterval: TimeInterval = 60
     static let minimumPollingBasic: TimeInterval = 60
     static let minimumPollingPro: TimeInterval = 10
