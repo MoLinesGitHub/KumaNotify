@@ -16,6 +16,17 @@ struct KumaNotifyEntry: TimelineEntry {
 }
 
 struct KumaNotifyProvider: TimelineProvider {
+    private let defaults: UserDefaults?
+    private let now: () -> Date
+
+    init(
+        defaults: UserDefaults? = UserDefaults(suiteName: AppConstants.appGroupId),
+        now: @escaping () -> Date = { .now }
+    ) {
+        self.defaults = defaults
+        self.now = now
+    }
+
     func placeholder(in context: Context) -> KumaNotifyEntry {
         .placeholder
     }
@@ -26,14 +37,13 @@ struct KumaNotifyProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<KumaNotifyEntry>) -> Void) {
         let entry = makeEntry()
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: .now) ?? .now
+        let nextUpdate = WidgetTimelineSupport.nextRefreshDate(from: now())
         completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
     }
 
-    private func makeEntry() -> KumaNotifyEntry {
-        let defaults = UserDefaults(suiteName: AppConstants.appGroupId)
-        let data = defaults.flatMap { WidgetData.read(from: $0) }
-        return KumaNotifyEntry(date: .now, data: data)
+    func makeEntry() -> KumaNotifyEntry {
+        let data = WidgetTimelineSupport.readSnapshot(from: defaults)
+        return KumaNotifyEntry(date: now(), data: data)
     }
 }
 
@@ -56,14 +66,14 @@ struct KumaNotifyWidgetEntryView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(statusColor(data.overallStatusRaw))
+                    .fill(statusColor(WidgetDataPresentation.statusColorKey(for: data.overallStatusRaw)))
                     .frame(width: 10, height: 10)
-                Text(statusLabel(data))
+                Text(WidgetDataPresentation.statusLabel(for: data))
                     .font(.headline)
                     .lineLimit(1)
             }
 
-            if data.overallStatusRaw != "unreachable" {
+            if WidgetDataPresentation.shouldShowSummary(for: data) {
                 Text(data.monitorSummaryLine)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -102,19 +112,10 @@ struct KumaNotifyWidgetEntryView: View {
 
     private func statusColor(_ key: String) -> Color {
         switch key {
-        case "allUp": .green
-        case "degraded": .yellow
-        case "someDown": .red
+        case "green": .green
+        case "yellow": .yellow
+        case "red": .red
         default: .gray
-        }
-    }
-
-    private func statusLabel(_ data: WidgetData) -> String {
-        switch data.overallStatusRaw {
-        case "allUp": String(localized: "All OK")
-        case "degraded": String(localized: "Degraded")
-        case "someDown": String(format: String(localized: "%lld down"), data.downCount)
-        default: String(localized: "Offline")
         }
     }
 }

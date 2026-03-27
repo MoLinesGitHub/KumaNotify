@@ -2178,4 +2178,97 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertNil(WidgetData.read(from: defaults))
         XCTAssertEqual(reloadCount, 1)
     }
+
+    func testWidgetTimelineSupportReadsPersistedSnapshotFromDefaults() {
+        let suiteName = "KumaNotifyTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let referenceDate = Date(timeIntervalSince1970: 1_711_535_200)
+        WidgetData(
+            upCount: 4,
+            totalCount: 5,
+            downCount: 1,
+            overallStatusRaw: "someDown",
+            lastCheckTime: referenceDate,
+            serverName: "Primary",
+            hasActiveIncident: true
+        ).write(to: defaults)
+
+        let snapshot = WidgetTimelineSupport.readSnapshot(from: defaults)
+
+        XCTAssertEqual(snapshot?.upCount, 4)
+        XCTAssertEqual(snapshot?.downCount, 1)
+        XCTAssertEqual(snapshot?.serverName, "Primary")
+        XCTAssertEqual(snapshot?.overallStatusRaw, "someDown")
+    }
+
+    func testWidgetTimelineSupportReturnsNilSnapshotWhenNoDataExists() {
+        let suiteName = "KumaNotifyTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertNil(WidgetTimelineSupport.readSnapshot(from: defaults))
+    }
+
+    func testWidgetTimelineSupportRefreshesAfterFifteenMinutes() {
+        let now = Date(timeIntervalSince1970: 1_711_535_200)
+        let nextUpdate = WidgetTimelineSupport.nextRefreshDate(from: now)
+        XCTAssertEqual(nextUpdate.timeIntervalSince(now), 900, accuracy: 1)
+    }
+
+    func testWidgetDataPresentationMapsVisibleStateBranches() {
+        let allUp = WidgetData(
+            upCount: 5,
+            totalCount: 5,
+            downCount: 0,
+            overallStatusRaw: "allUp",
+            lastCheckTime: nil,
+            serverName: nil,
+            hasActiveIncident: false
+        )
+        let degraded = WidgetData(
+            upCount: 5,
+            totalCount: 5,
+            downCount: 0,
+            overallStatusRaw: "degraded",
+            lastCheckTime: nil,
+            serverName: nil,
+            hasActiveIncident: false
+        )
+        let someDown = WidgetData(
+            upCount: 3,
+            totalCount: 5,
+            downCount: 2,
+            overallStatusRaw: "someDown",
+            lastCheckTime: nil,
+            serverName: nil,
+            hasActiveIncident: true
+        )
+        let offline = WidgetData(
+            upCount: 0,
+            totalCount: 0,
+            downCount: 0,
+            overallStatusRaw: "unreachable",
+            lastCheckTime: nil,
+            serverName: nil,
+            hasActiveIncident: true
+        )
+
+        XCTAssertEqual(WidgetDataPresentation.statusColorKey(for: allUp.overallStatusRaw), "green")
+        XCTAssertEqual(WidgetDataPresentation.statusColorKey(for: degraded.overallStatusRaw), "yellow")
+        XCTAssertEqual(WidgetDataPresentation.statusColorKey(for: someDown.overallStatusRaw), "red")
+        XCTAssertEqual(WidgetDataPresentation.statusColorKey(for: offline.overallStatusRaw), "gray")
+
+        XCTAssertEqual(WidgetDataPresentation.statusLabel(for: allUp), String(localized: "All OK"))
+        XCTAssertEqual(WidgetDataPresentation.statusLabel(for: degraded), String(localized: "Degraded"))
+        XCTAssertEqual(
+            WidgetDataPresentation.statusLabel(for: someDown),
+            String.localizedStringWithFormat(String(localized: "%lld down"), Int64(2))
+        )
+        XCTAssertEqual(WidgetDataPresentation.statusLabel(for: offline), String(localized: "Offline"))
+
+        XCTAssertTrue(WidgetDataPresentation.shouldShowSummary(for: allUp))
+        XCTAssertFalse(WidgetDataPresentation.shouldShowSummary(for: offline))
+    }
 }

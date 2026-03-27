@@ -1,5 +1,42 @@
 import Foundation
 
+enum WidgetDataPresentation {
+    static func shouldShowSummary(for data: WidgetData) -> Bool {
+        data.overallStatusRaw != "unreachable"
+    }
+
+    static func statusColorKey(for overallStatusRaw: String) -> String {
+        switch overallStatusRaw {
+        case "allUp": "green"
+        case "degraded": "yellow"
+        case "someDown": "red"
+        default: "gray"
+        }
+    }
+
+    static func statusLabel(for data: WidgetData) -> String {
+        switch data.overallStatusRaw {
+        case "allUp": String(localized: "All OK")
+        case "degraded": String(localized: "Degraded")
+        case "someDown": String.localizedStringWithFormat(
+            String(localized: "%lld down"),
+            Int64(data.downCount)
+        )
+        default: String(localized: "Offline")
+        }
+    }
+}
+
+enum WidgetTimelineSupport {
+    static func readSnapshot(from defaults: UserDefaults?) -> WidgetData? {
+        defaults.flatMap { WidgetData.read(from: $0) }
+    }
+
+    static func nextRefreshDate(from now: Date) -> Date {
+        Calendar.current.date(byAdding: .minute, value: 15, to: now) ?? now
+    }
+}
+
 /// Data structure shared between main app and widget via App Group UserDefaults.
 struct WidgetData: Codable {
     static let freshnessReloadInterval: TimeInterval = 300
