@@ -890,6 +890,16 @@
         }
       }
     },
+    "Invalid status page slug" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slug de status page no válido"
+          }
+        }
+      }
+    },
     "JSON" : {
       "comment" : "Export format label for JSON files.",
       "extractionState" : "stale",

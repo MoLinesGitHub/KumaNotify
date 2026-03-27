@@ -14,13 +14,11 @@ final class NetworkMonitor {
     init() {
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
-                self?.isConnected = path.status == .satisfied
-                self?.isExpensive = path.isExpensive
-                if path.availableInterfaces.isEmpty {
-                    self?.connectionType = nil
-                } else {
-                    self?.connectionType = path.availableInterfaces.first?.type
-                }
+                self?.applyPathUpdate(
+                    status: path.status,
+                    isExpensive: path.isExpensive,
+                    connectionType: path.availableInterfaces.first?.type
+                )
             }
         }
     }
@@ -31,5 +29,15 @@ final class NetworkMonitor {
 
     func stop() {
         monitor.cancel()
+    }
+
+    func applyPathUpdate(
+        status: NWPath.Status,
+        isExpensive: Bool,
+        connectionType: NWInterface.InterfaceType?
+    ) {
+        isConnected = status == .satisfied
+        self.isExpensive = isExpensive
+        self.connectionType = connectionType
     }
 }

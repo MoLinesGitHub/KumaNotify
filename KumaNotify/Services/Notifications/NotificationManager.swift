@@ -38,6 +38,36 @@ protocol NotificationManaging: AnyObject {
 final class NotificationManager: NSObject, Sendable, NotificationManaging {
     static let shared = NotificationManager()
 
+    private let requestAuthorizationHandler: @Sendable () async throws -> Bool
+    private let authorizationStatusHandler: @Sendable () async -> UNAuthorizationStatus
+    private let openURLHandler: @Sendable (URL) -> Bool
+    private let scheduleRequestHandler: @Sendable (UNNotificationRequest) -> Void
+
+    init(
+        requestAuthorizationHandler: @escaping @Sendable () async throws -> Bool = {
+            try await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound, .badge])
+        },
+        authorizationStatusHandler: @escaping @Sendable () async -> UNAuthorizationStatus = {
+            await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        },
+        openURLHandler: @escaping @Sendable (URL) -> Bool = { url in
+            NSWorkspace.shared.open(url)
+        },
+        scheduleRequestHandler: @escaping @Sendable (UNNotificationRequest) -> Void = { request in
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error {
+                    Logger.app.error("Failed to deliver notification '\(request.identifier)': \(error.localizedDescription)")
+                }
+            }
+        }
+    ) {
+        self.requestAuthorizationHandler = requestAuthorizationHandler
+        self.authorizationStatusHandler = authorizationStatusHandler
+        self.openURLHandler = openURLHandler
+        self.scheduleRequestHandler = scheduleRequestHandler
+    }
+
     static func downAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
         "down_\(serverConnectionId.uuidString)_\(monitorId)"
     }
@@ -52,8 +82,7 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
 
     func requestPermission() async -> NotificationAuthorizationStatus {
         do {
-            _ = try await UNUserNotificationCenter.current()
-                .requestAuthorization(options: [.alert, .sound, .badge])
+            _ = try await requestAuthorizationHandler()
             return await notificationAuthorizationStatus()
         } catch {
             Logger.app.error("Notification permission request failed: \(error.localizedDescription)")
@@ -62,8 +91,7 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
     }
 
     func notificationAuthorizationStatus() async -> NotificationAuthorizationStatus {
-        let settings = await UNUserNotificationCenter.current().notificationSettings()
-        switch settings.authorizationStatus {
+        switch await authorizationStatusHandler() {
         case .authorized, .provisional, .ephemeral:
             return .authorized
         case .notDetermined:
@@ -80,12 +108,12 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
     @discardableResult
     func openSystemNotificationSettings() -> Bool {
         if let deepLink = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension"),
-           NSWorkspace.shared.open(deepLink) {
+           openURLHandler(deepLink) {
             return true
         }
 
         let systemSettingsURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
-        return NSWorkspace.shared.open(systemSettingsURL)
+        return openURLHandler(systemSettingsURL)
     }
 
     func sendDownAlert(
@@ -172,11 +200,7 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
 
     private func scheduleNotification(id: String, content: UNMutableNotificationContent) {
         let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error {
-                Logger.app.error("Failed to deliver notification '\(id)': \(error.localizedDescription)")
-            }
-        }
+        scheduleRequestHandler(request)
     }
 
     private static let durationFormatter: DateComponentsFormatter = {

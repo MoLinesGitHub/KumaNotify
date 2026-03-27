@@ -1,4 +1,6 @@
 import XCTest
+import UserNotifications
+import IOKit.ps
 @testable import KumaNotify
 
 final class KumaNotifyTests: XCTestCase {
@@ -140,6 +142,60 @@ final class KumaNotifyTests: XCTestCase {
         }
     }
 
+    final class NotificationRequestRecorder: @unchecked Sendable {
+        var requests: [UNNotificationRequest] = []
+
+        func record(_ request: UNNotificationRequest) {
+            requests.append(request)
+        }
+    }
+
+    final class URLRecorder: @unchecked Sendable {
+        var urls: [URL] = []
+
+        func record(_ url: URL) {
+            urls.append(url)
+        }
+    }
+
+    actor ScriptedHTTPClient: HTTPClientProtocol {
+        private(set) var requestedURLs: [URL] = []
+        let statusPageResponse: UKStatusPageResponse
+        let heartbeatResponse: UKHeartbeatResponse
+        let errorByURL: [URL: Error]
+
+        init(
+            statusPageResponse: UKStatusPageResponse,
+            heartbeatResponse: UKHeartbeatResponse,
+            errorByURL: [URL: Error] = [:]
+        ) {
+            self.statusPageResponse = statusPageResponse
+            self.heartbeatResponse = heartbeatResponse
+            self.errorByURL = errorByURL
+        }
+
+        func get<T: Decodable & Sendable>(url: URL) async throws -> T {
+            requestedURLs.append(url)
+
+            if let error = errorByURL[url] {
+                throw error
+            }
+
+            switch T.self {
+            case is UKHeartbeatResponse.Type:
+                return heartbeatResponse as! T
+            case is UKStatusPageResponse.Type:
+                return statusPageResponse as! T
+            default:
+                fatalError("Unexpected response type requested: \(T.self)")
+            }
+        }
+
+        func requestedURLSnapshot() -> [URL] {
+            requestedURLs
+        }
+    }
+
     func testMonitorStatusRawValues() {
         XCTAssertEqual(MonitorStatus.up.rawValue, 1)
         XCTAssertEqual(MonitorStatus.down.rawValue, 0)
@@ -270,6 +326,19 @@ final class KumaNotifyTests: XCTestCase {
             ServerConnection.normalizedDisplayName(from: "  Primary  "),
             "Primary"
         )
+    }
+
+    func testServerConnectionNormalizedStatusPageSlugTrimsOuterSlashesAndRejectsNestedPaths() {
+        XCTAssertEqual(
+            ServerConnection.normalizedStatusPageSlug(from: "  /status-page/  "),
+            "status-page"
+        )
+        XCTAssertEqual(
+            ServerConnection.validatedStatusPageSlug(from: "  /primary-status/  "),
+            "primary-status"
+        )
+        XCTAssertNil(ServerConnection.validatedStatusPageSlug(from: "team/primary"))
+        XCTAssertNil(ServerConnection.validatedStatusPageSlug(from: "   ///   "))
     }
 
     @MainActor
@@ -918,6 +987,27 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(storeManager.productLoadErrorMessage, "Restore failed")
     }
 
+    @MainActor
+    func testStoreManagerRefreshStatusClearsStaleFailureAfterSuccessfulRecovery() async {
+        let storeManager = StoreManager(
+            fetchProducts: { _ in [] },
+            syncAppStore: { throw FailingTestError() },
+            startListeningForTransactions: false,
+            autoRefresh: false
+        )
+
+        await storeManager.restorePurchases()
+        guard case .failed = storeManager.purchaseState else {
+            return XCTFail("Expected restore failure to put purchaseState into failed")
+        }
+
+        await storeManager.refreshStatus()
+
+        XCTAssertEqual(storeManager.purchaseState, .idle)
+        XCTAssertNil(storeManager.productLoadErrorMessage)
+        XCTAssertFalse(storeManager.proUnlocked)
+    }
+
     func testIntentStatusFormatterBuildsLocalizedSummaries() {
         let data = WidgetData(
             upCount: 3,
@@ -976,6 +1066,7 @@ final class KumaNotifyTests: XCTestCase {
             "Allow notifications for Kuma Notify in System Settings, then enable them again here.",
             "Open System Settings",
             "Retry",
+            "Invalid status page slug",
             "%lld up / %lld total",
             "%@ — %@",
             "%1$@ current, %2$@ min, %3$@ max",
@@ -1525,6 +1616,105 @@ final class KumaNotifyTests: XCTestCase {
     }
 
     @MainActor
+    func testNotificationManagerMapsAuthorizationStatusesFromSystemValues() async {
+        let authorizedManager = NotificationManager(
+            authorizationStatusHandler: { .authorized }
+        )
+        let notDeterminedManager = NotificationManager(
+            authorizationStatusHandler: { .notDetermined }
+        )
+        let deniedManager = NotificationManager(
+            authorizationStatusHandler: { .denied }
+        )
+
+        let authorizedStatus = await authorizedManager.notificationAuthorizationStatus()
+        let notDeterminedStatus = await notDeterminedManager.notificationAuthorizationStatus()
+        let deniedStatus = await deniedManager.notificationAuthorizationStatus()
+
+        XCTAssertEqual(authorizedStatus, .authorized)
+        XCTAssertEqual(notDeterminedStatus, .notDetermined)
+        XCTAssertEqual(deniedStatus, .denied)
+    }
+
+    @MainActor
+    func testNotificationManagerOpenSystemSettingsFallsBackWhenDeepLinkFails() {
+        let recorder = URLRecorder()
+        let manager = NotificationManager(
+            openURLHandler: { url in
+                recorder.record(url)
+                return recorder.urls.count > 1
+            }
+        )
+
+        XCTAssertTrue(manager.openSystemNotificationSettings())
+        XCTAssertEqual(recorder.urls.count, 2)
+        XCTAssertEqual(recorder.urls.first?.scheme, "x-apple.systempreferences")
+        XCTAssertEqual(recorder.urls.last?.path, "/System/Applications/System Settings.app")
+    }
+
+    @MainActor
+    func testNotificationManagerSchedulesDownAlertWithExpectedMetadata() {
+        let recorder = NotificationRequestRecorder()
+        let connectionID = UUID()
+        let manager = NotificationManager(
+            scheduleRequestHandler: { request in
+                recorder.record(request)
+            }
+        )
+
+        manager.sendDownAlert(
+            serverConnectionId: connectionID,
+            monitorId: "api",
+            monitorName: "API",
+            serverName: "Primary",
+            soundOption: .silent
+        )
+
+        let request = try? XCTUnwrap(recorder.requests.first)
+        XCTAssertEqual(request?.identifier, NotificationManager.downAlertIdentifier(serverConnectionId: connectionID, monitorId: "api"))
+        XCTAssertEqual(request?.content.title, String(localized: "Monitor Down"))
+        XCTAssertEqual(request?.content.subtitle, "API")
+        XCTAssertEqual(request?.content.categoryIdentifier, "MONITOR_DOWN")
+        XCTAssertEqual(request?.content.interruptionLevel, .timeSensitive)
+        XCTAssertNil(request?.content.sound)
+    }
+
+    @MainActor
+    func testNetworkMonitorApplyPathUpdateTracksConnectivityAndInterface() {
+        let monitor = NetworkMonitor()
+
+        monitor.applyPathUpdate(status: .unsatisfied, isExpensive: true, connectionType: .cellular)
+        XCTAssertFalse(monitor.isConnected)
+        XCTAssertTrue(monitor.isExpensive)
+        XCTAssertEqual(monitor.connectionType, .cellular)
+
+        monitor.applyPathUpdate(status: .satisfied, isExpensive: false, connectionType: .wifi)
+        XCTAssertTrue(monitor.isConnected)
+        XCTAssertFalse(monitor.isExpensive)
+        XCTAssertEqual(monitor.connectionType, .wifi)
+    }
+
+    func testPowerMonitorNormalizedPowerStateHandlesBatteryAndFallbackCases() {
+        let acState = PowerMonitor.normalizedPowerState(from: nil)
+        XCTAssertFalse(acState.isOnBattery)
+        XCTAssertEqual(acState.batteryLevel, 1.0)
+
+        let batteryState = PowerMonitor.normalizedPowerState(from: [
+            kIOPSPowerSourceStateKey as String: kIOPSBatteryPowerValue,
+            kIOPSCurrentCapacityKey as String: 25,
+            kIOPSMaxCapacityKey as String: 100
+        ])
+        XCTAssertTrue(batteryState.isOnBattery)
+        XCTAssertEqual(batteryState.batteryLevel, 0.25)
+
+        let unknownCapacityState = PowerMonitor.normalizedPowerState(from: [
+            kIOPSPowerSourceStateKey as String: kIOPSACPowerValue
+        ])
+        XCTAssertFalse(unknownCapacityState.isOnBattery)
+        XCTAssertEqual(unknownCapacityState.batteryLevel, 1.0)
+    }
+
+    @MainActor
     func testDashboardViewModelIgnoresStaleResultsForPreviousConnection() {
         let (suiteName, store) = makeSettingsStore()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
@@ -1745,6 +1935,247 @@ final class KumaNotifyTests: XCTestCase {
         await viewModel.refresh()
         await viewModel.refresh()
 
+        XCTAssertEqual(reloadCount, 1)
+    }
+
+    func testUptimeKumaServiceFetchStatusPageRequestsHeartbeatsBeforeStatusPageAndMapsCombinedResult() async throws {
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://status.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let heartbeatResponse = UKHeartbeatResponse(
+            heartbeatList: [
+                "1": [
+                    UKHeartbeat(
+                        status: MonitorStatus.up.rawValue,
+                        time: "2026-03-27 10:00:00",
+                        msg: "ok",
+                        ping: 123
+                    )
+                ]
+            ],
+            uptimeList: [
+                "1_24": 99.5
+            ]
+        )
+        let statusPageResponse = UKStatusPageResponse(
+            config: UKConfig(
+                slug: "primary",
+                title: "Primary Status",
+                description: nil,
+                icon: nil,
+                autoRefreshInterval: 60,
+                theme: nil,
+                published: true,
+                showTags: false,
+                showCertificateExpiry: true,
+                showOnlyLastHeartbeat: false,
+                footerText: nil,
+                showPoweredBy: false
+            ),
+            incidents: [],
+            publicGroupList: [
+                UKPublicGroup(
+                    id: 10,
+                    name: "Core",
+                    weight: 0,
+                    monitorList: [
+                        UKMonitor(
+                            id: 1,
+                            name: "API",
+                            sendUrl: 0,
+                            type: "http",
+                            certExpiryDaysRemaining: 14,
+                            validCert: true
+                        )
+                    ]
+                )
+            ],
+            maintenanceList: []
+        )
+        let httpClient = ScriptedHTTPClient(
+            statusPageResponse: statusPageResponse,
+            heartbeatResponse: heartbeatResponse
+        )
+        let service = UptimeKumaService(httpClient: httpClient)
+
+        let result = try await service.fetchStatusPage(connection: connection)
+        let requestedURLs = await httpClient.requestedURLSnapshot()
+
+        XCTAssertEqual(requestedURLs, [connection.heartbeatURL, connection.statusPageURL])
+        XCTAssertEqual(result.title, "Primary Status")
+        XCTAssertEqual(result.groups.count, 1)
+        XCTAssertEqual(result.groups[0].monitors.count, 1)
+        XCTAssertEqual(result.groups[0].monitors[0].currentStatus, .up)
+        XCTAssertEqual(result.groups[0].monitors[0].latestPing, 123)
+        XCTAssertEqual(result.groups[0].monitors[0].uptime24h, 99.5)
+        XCTAssertEqual(result.showCertExpiry, true)
+        XCTAssertEqual(result.heartbeats["1"]?.count, 1)
+    }
+
+    func testUptimeKumaServiceValidateConnectionOnlyHitsStatusPageEndpoint() async throws {
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://status.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let httpClient = ScriptedHTTPClient(
+            statusPageResponse: UKStatusPageResponse(
+                config: UKConfig(
+                    slug: "primary",
+                    title: "Primary Status",
+                    description: nil,
+                    icon: nil,
+                    autoRefreshInterval: nil,
+                    theme: nil,
+                    published: true,
+                    showTags: false,
+                    showCertificateExpiry: false,
+                    showOnlyLastHeartbeat: false,
+                    footerText: nil,
+                    showPoweredBy: false
+                ),
+                incidents: [],
+                publicGroupList: [],
+                maintenanceList: []
+            ),
+            heartbeatResponse: UKHeartbeatResponse(heartbeatList: [:], uptimeList: [:])
+        )
+        let service = UptimeKumaService(httpClient: httpClient)
+
+        let isValid = try await service.validateConnection(connection)
+        let requestedURLs = await httpClient.requestedURLSnapshot()
+
+        XCTAssertTrue(isValid)
+        XCTAssertEqual(requestedURLs, [connection.statusPageURL])
+    }
+
+    func testUptimeKumaServiceFetchHeartbeatsOnlyHitsHeartbeatEndpoint() async throws {
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://status.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let httpClient = ScriptedHTTPClient(
+            statusPageResponse: UKStatusPageResponse(
+                config: UKConfig(
+                    slug: "primary",
+                    title: "Primary Status",
+                    description: nil,
+                    icon: nil,
+                    autoRefreshInterval: nil,
+                    theme: nil,
+                    published: true,
+                    showTags: false,
+                    showCertificateExpiry: false,
+                    showOnlyLastHeartbeat: false,
+                    footerText: nil,
+                    showPoweredBy: false
+                ),
+                incidents: [],
+                publicGroupList: [],
+                maintenanceList: []
+            ),
+            heartbeatResponse: UKHeartbeatResponse(
+                heartbeatList: [
+                    "42": [
+                        UKHeartbeat(
+                            status: MonitorStatus.down.rawValue,
+                            time: "2026-03-27 11:00:00",
+                            msg: "down",
+                            ping: nil
+                        )
+                    ]
+                ],
+                uptimeList: ["42_24": 0.0]
+            )
+        )
+        let service = UptimeKumaService(httpClient: httpClient)
+
+        let result = try await service.fetchHeartbeats(connection: connection)
+        let requestedURLs = await httpClient.requestedURLSnapshot()
+
+        XCTAssertEqual(requestedURLs, [connection.heartbeatURL])
+        XCTAssertEqual(result.heartbeats["42"]?.first?.status, .down)
+        XCTAssertEqual(result.uptimes["42_24"], 0.0)
+    }
+
+    func testMonitoringServiceFactoryCreatesUptimeKumaService() {
+        let service = MonitoringServiceFactory.create(for: .uptimeKuma)
+        XCTAssertTrue(service is UptimeKumaService)
+    }
+
+    func testKumaNotifyAppLaunchBehaviorRestoresMonitoringWhenConnectionExists() {
+        let behavior = KumaNotifyApp.launchBehavior(
+            hasServerConnection: true,
+            hasCompletedOnboarding: false
+        )
+
+        XCTAssertEqual(behavior, .restoreMonitoring)
+    }
+
+    func testKumaNotifyAppLaunchBehaviorShowsOnboardingOnlyWhenNoConnectionAndIncompleteSetup() {
+        XCTAssertEqual(
+            KumaNotifyApp.launchBehavior(
+                hasServerConnection: false,
+                hasCompletedOnboarding: false
+            ),
+            .emptyState(showOnboarding: true)
+        )
+        XCTAssertEqual(
+            KumaNotifyApp.launchBehavior(
+                hasServerConnection: false,
+                hasCompletedOnboarding: true
+            ),
+            .emptyState(showOnboarding: false)
+        )
+    }
+
+    func testKumaNotifyAppShouldPresentOnboardingRespectsUITestOverride() {
+        XCTAssertTrue(KumaNotifyApp.shouldPresentOnboarding(
+            showOnboarding: true,
+            uiTestShowsOnboarding: false
+        ))
+        XCTAssertFalse(KumaNotifyApp.shouldPresentOnboarding(
+            showOnboarding: false,
+            uiTestShowsOnboarding: false
+        ))
+        XCTAssertFalse(KumaNotifyApp.shouldPresentOnboarding(
+            showOnboarding: true,
+            uiTestShowsOnboarding: true
+        ))
+    }
+
+    func testKumaNotifyAppShouldSeedUITestServerConnectionOnlyWhenStoreIsEmpty() {
+        XCTAssertTrue(KumaNotifyApp.shouldSeedUITestServerConnection(true, existingConnectionCount: 0))
+        XCTAssertFalse(KumaNotifyApp.shouldSeedUITestServerConnection(true, existingConnectionCount: 1))
+        XCTAssertFalse(KumaNotifyApp.shouldSeedUITestServerConnection(false, existingConnectionCount: 0))
+    }
+
+    func testKumaNotifyAppClearSharedWidgetDataRemovesSnapshotAndReloads() {
+        let suiteName = "KumaNotifyTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let snapshot = WidgetData(
+            upCount: 3,
+            totalCount: 3,
+            downCount: 0,
+            overallStatusRaw: OverallStatus.allUp.widgetKey,
+            lastCheckTime: Date(),
+            serverName: "Primary",
+            hasActiveIncident: false
+        )
+        snapshot.write(to: defaults)
+
+        var reloadCount = 0
+        KumaNotifyApp.clearSharedWidgetData(
+            defaults: defaults,
+            reloadWidgets: { reloadCount += 1 }
+        )
+
+        XCTAssertNil(WidgetData.read(from: defaults))
         XCTAssertEqual(reloadCount, 1)
     }
 }

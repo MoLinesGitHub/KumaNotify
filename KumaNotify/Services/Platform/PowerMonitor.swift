@@ -39,19 +39,34 @@ final class PowerMonitor {
               let first = sources.first,
               let desc = IOPSGetPowerSourceDescription(snapshot, first as CFTypeRef)?.takeUnretainedValue() as? [String: Any]
         else {
-            // Desktop Mac or no battery info — treat as AC
-            isOnBattery = false
-            batteryLevel = 1.0
+            applyPowerState(from: nil)
             return
         }
 
-        let powerSource = desc[kIOPSPowerSourceStateKey] as? String ?? ""
-        isOnBattery = (powerSource == kIOPSBatteryPowerValue)
+        applyPowerState(from: desc)
+    }
 
-        if let capacity = desc[kIOPSCurrentCapacityKey] as? Int,
-           let maxCapacity = desc[kIOPSMaxCapacityKey] as? Int,
-           maxCapacity > 0 {
-            batteryLevel = Double(capacity) / Double(maxCapacity)
+    func applyPowerState(from description: [String: Any]?) {
+        let state = Self.normalizedPowerState(from: description)
+        isOnBattery = state.isOnBattery
+        batteryLevel = state.batteryLevel
+    }
+
+    nonisolated static func normalizedPowerState(from description: [String: Any]?) -> (isOnBattery: Bool, batteryLevel: Double) {
+        guard let description else {
+            // Desktop Mac or no battery info — treat as AC
+            return (false, 1.0)
         }
+
+        let powerSource = description[kIOPSPowerSourceStateKey] as? String ?? ""
+        let isOnBattery = (powerSource == kIOPSBatteryPowerValue)
+
+        if let capacity = description[kIOPSCurrentCapacityKey] as? Int,
+           let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,
+           maxCapacity > 0 {
+            return (isOnBattery, Double(capacity) / Double(maxCapacity))
+        }
+
+        return (isOnBattery, 1.0)
     }
 }

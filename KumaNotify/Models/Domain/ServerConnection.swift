@@ -40,6 +40,20 @@ struct ServerConnection: Codable, Identifiable, Sendable, Hashable {
         return trimmed
     }
 
+    static func normalizedStatusPageSlug(from rawValue: String) -> String {
+        rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    static func validatedStatusPageSlug(from rawValue: String) -> String? {
+        let normalized = normalizedStatusPageSlug(from: rawValue)
+        guard !normalized.isEmpty, !normalized.contains("/") else {
+            return nil
+        }
+        return normalized
+    }
+
     static func validatedBaseURL(from rawValue: String) -> URL? {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,

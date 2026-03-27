@@ -345,10 +345,11 @@ struct ServerFormView: View {
     @State private var testResult: (success: Bool, message: String)?
 
     private var isEditing: Bool { connection != nil }
-    private var normalizedSlug: String { slug.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var normalizedSlug: String { ServerConnection.normalizedStatusPageSlug(from: slug) }
     private var normalizedServerName: String { ServerConnection.normalizedDisplayName(from: serverName) }
     private var validatedServerURL: URL? { ServerConnection.validatedBaseURL(from: serverURL) }
-    private var canSubmit: Bool { validatedServerURL != nil && !normalizedSlug.isEmpty }
+    private var validatedSlug: String? { ServerConnection.validatedStatusPageSlug(from: slug) }
+    private var canSubmit: Bool { validatedServerURL != nil && validatedSlug != nil }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -408,12 +409,12 @@ struct ServerFormView: View {
     }
 
     private func save() {
-        guard let url = validatedServerURL else { return }
+        guard let url = validatedServerURL, let validatedSlug else { return }
         let conn = ServerConnection(
             id: connection?.id ?? UUID(),
             name: normalizedServerName,
             baseURL: url,
-            statusPageSlug: normalizedSlug,
+            statusPageSlug: validatedSlug,
             isDefault: connection?.isDefault ?? false
         )
         onSave(conn)
@@ -424,10 +425,14 @@ struct ServerFormView: View {
             testResult = (false, String(localized: "Invalid URL"))
             return
         }
+        guard let validatedSlug else {
+            testResult = (false, String(localized: "Invalid status page slug"))
+            return
+        }
         let conn = ServerConnection(
             name: normalizedServerName,
             baseURL: url,
-            statusPageSlug: normalizedSlug
+            statusPageSlug: validatedSlug
         )
         isTesting = true
         defer { isTesting = false }

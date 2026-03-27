@@ -54,6 +54,7 @@ final class StoreManager {
     func refreshStatus() async {
         await loadProduct()
         await updateEntitlement()
+        clearRecoveredFailureStateIfNeeded()
     }
 
     func purchasePro() async {
@@ -90,6 +91,7 @@ final class StoreManager {
         do {
             try await syncAppStore()
             await updateEntitlement()
+            clearRecoveredFailureStateIfNeeded()
         } catch {
             Logger.app.error("Restore purchases failed: \(error.localizedDescription)")
             purchaseState = .failed(error.localizedDescription)
@@ -132,6 +134,12 @@ final class StoreManager {
         } else if purchaseState == .purchased {
             purchaseState = .idle
         }
+    }
+
+    private func clearRecoveredFailureStateIfNeeded() {
+        guard case .failed = purchaseState else { return }
+        guard productLoadErrorMessage == nil, !proUnlocked else { return }
+        purchaseState = .idle
     }
 
     private func listenForTransactions() -> Task<Void, Never> {

@@ -3,6 +3,21 @@ import SwiftData
 import WidgetKit
 import os
 
+enum KumaNotifyAppLaunchBehavior: Equatable {
+    case restoreMonitoring
+    case emptyState(showOnboarding: Bool)
+
+    static func determine(
+        hasServerConnection: Bool,
+        hasCompletedOnboarding: Bool
+    ) -> Self {
+        if hasServerConnection {
+            return .restoreMonitoring
+        }
+        return .emptyState(showOnboarding: !hasCompletedOnboarding)
+    }
+}
+
 @MainActor
 @main
 struct KumaNotifyApp: App {
@@ -104,7 +119,10 @@ struct KumaNotifyApp: App {
         let engine = PollingEngine()
         let sm = StoreManager()
 
-        if uiTestSeedsServerConnection && store.serverConnections.isEmpty {
+        if Self.shouldSeedUITestServerConnection(
+            uiTestSeedsServerConnection,
+            existingConnectionCount: store.serverConnections.count
+        ) {
             store.addConnection(ServerConnection(
                 name: "Primary",
                 baseURL: URL(string: "https://primary.example.com")!,
@@ -125,7 +143,12 @@ struct KumaNotifyApp: App {
             _persistence = State(initialValue: nil)
         }
 
-        if let connection = store.serverConnection {
+        switch Self.launchBehavior(
+            hasServerConnection: store.serverConnection != nil,
+            hasCompletedOnboarding: store.hasCompletedOnboarding
+        ) {
+        case .restoreMonitoring:
+            let connection = store.serverConnection!
             let menuBarVM = MenuBarViewModel(
                 settingsStore: store,
                 pollingEngine: engine,
@@ -140,9 +163,9 @@ struct KumaNotifyApp: App {
             _menuBarVM = State(initialValue: menuBarVM)
             _dashboardVM = State(initialValue: dashboardVM)
             bootstrapMonitoring(menuBarVM)
-        } else {
+        case .emptyState(let shouldShowOnboarding):
             Self.clearSharedWidgetData()
-            _showOnboarding = State(initialValue: !store.hasCompletedOnboarding)
+            _showOnboarding = State(initialValue: shouldShowOnboarding)
         }
 
         Task { @MainActor in
@@ -246,16 +269,53 @@ struct KumaNotifyApp: App {
     }
 
     private func presentOnboardingIfNeeded() {
-        guard showOnboarding, !uiTestShowsOnboarding else { return }
+        guard Self.shouldPresentOnboarding(
+            showOnboarding: showOnboarding,
+            uiTestShowsOnboarding: uiTestShowsOnboarding
+        ) else { return }
         showOnboarding = false
         NSApp.activate(ignoringOtherApps: true)
         openWindow(id: "onboarding")
     }
 
     private static func clearSharedWidgetData() {
-        guard let defaults = UserDefaults(suiteName: AppConstants.appGroupId) else { return }
+        clearSharedWidgetData(
+            defaults: UserDefaults(suiteName: AppConstants.appGroupId),
+            reloadWidgets: { WidgetCenter.shared.reloadTimelines(ofKind: AppConstants.widgetKind) }
+        )
+    }
+
+    nonisolated static func launchBehavior(
+        hasServerConnection: Bool,
+        hasCompletedOnboarding: Bool
+    ) -> KumaNotifyAppLaunchBehavior {
+        KumaNotifyAppLaunchBehavior.determine(
+            hasServerConnection: hasServerConnection,
+            hasCompletedOnboarding: hasCompletedOnboarding
+        )
+    }
+
+    nonisolated static func shouldSeedUITestServerConnection(
+        _ uiTestSeedsServerConnection: Bool,
+        existingConnectionCount: Int
+    ) -> Bool {
+        uiTestSeedsServerConnection && existingConnectionCount == 0
+    }
+
+    nonisolated static func shouldPresentOnboarding(
+        showOnboarding: Bool,
+        uiTestShowsOnboarding: Bool
+    ) -> Bool {
+        showOnboarding && !uiTestShowsOnboarding
+    }
+
+    nonisolated static func clearSharedWidgetData(
+        defaults: UserDefaults?,
+        reloadWidgets: () -> Void
+    ) {
+        guard let defaults else { return }
         WidgetData.clear(from: defaults)
-        WidgetCenter.shared.reloadTimelines(ofKind: AppConstants.widgetKind)
+        reloadWidgets()
     }
 }
 
