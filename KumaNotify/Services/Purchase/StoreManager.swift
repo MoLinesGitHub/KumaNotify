@@ -1,6 +1,5 @@
 import Foundation
 import StoreKit
-import os
 
 @Observable
 @MainActor
@@ -70,7 +69,7 @@ final class StoreManager {
                     applyEntitlementState(isEntitled: true)
                 case .unverified(let transaction, let error):
                     await transaction.finish()
-                    Logger.app.error("Unverified transaction: \(error.localizedDescription)")
+                    print("Purchase: Unverified transaction: \(error.localizedDescription)")
                     purchaseState = .failed(error.localizedDescription)
                     await updateEntitlement()
                 }
@@ -82,7 +81,7 @@ final class StoreManager {
                 purchaseState = .idle
             }
         } catch {
-            Logger.app.error("Purchase failed: \(error.localizedDescription)")
+            print("Purchase: Purchase failed: \(error.localizedDescription)")
             purchaseState = .failed(error.localizedDescription)
         }
     }
@@ -93,7 +92,7 @@ final class StoreManager {
             await updateEntitlement()
             clearRecoveredFailureStateIfNeeded()
         } catch {
-            Logger.app.error("Restore purchases failed: \(error.localizedDescription)")
+            print("Purchase: Restore purchases failed: \(error.localizedDescription)")
             purchaseState = .failed(error.localizedDescription)
         }
     }
@@ -106,7 +105,7 @@ final class StoreManager {
             proProduct = products.first
             productLoadErrorMessage = nil
         } catch {
-            Logger.app.error("Failed to load products: \(error.localizedDescription)")
+            print("Purchase: Failed to load products: \(error.localizedDescription)")
             proProduct = nil
             productLoadErrorMessage = error.localizedDescription
         }
@@ -121,7 +120,7 @@ final class StoreManager {
                     found = true
                 }
             case .unverified(let transaction, let error):
-                Logger.app.warning("Unverified entitlement for \(transaction.productID): \(error.localizedDescription)")
+                print("Purchase: Unverified entitlement for \(transaction.productID): \(error.localizedDescription)")
             }
         }
         applyEntitlementState(isEntitled: found)
@@ -157,7 +156,7 @@ final class StoreManager {
                     }
                 case .unverified(let transaction, let error):
                     await transaction.finish()
-                    Logger.app.warning("Unverified update for \(transaction.productID): \(error.localizedDescription)")
+                    print("Purchase: Unverified update for \(transaction.productID): \(error.localizedDescription)")
                 }
             }
         }

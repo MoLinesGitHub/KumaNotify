@@ -1,27 +1,23 @@
 import Foundation
 import SwiftData
-import os
 
-@MainActor
-@Observable
-final class PersistenceManager {
-    let modelContainer: ModelContainer
-    private let modelContext: ModelContext
-
-    init(isStoredInMemoryOnly: Bool = false) throws {
+@ModelActor
+public actor PersistenceManager {
+    
+    public init(isStoredInMemoryOnly: Bool = false) throws {
         let schema = Schema([IncidentRecord.self, MonitorPreference.self])
         let config = ModelConfiguration(
             "KumaNotify",
             schema: schema,
             isStoredInMemoryOnly: isStoredInMemoryOnly
         )
-        self.modelContainer = try ModelContainer(for: schema, configurations: [config])
-        self.modelContext = modelContainer.mainContext
+        let container = try ModelContainer(for: schema, configurations: [config])
+        self.init(modelContainer: container)
     }
 
     // MARK: - Incident Records
 
-    func recordIncident(_ record: IncidentRecord) {
+    public func recordIncident(_ record: IncidentRecord) {
         // Deduplication: skip if same monitor+transition within 60s
         let windowStart = record.timestamp.addingTimeInterval(-60)
 
@@ -40,25 +36,25 @@ final class PersistenceManager {
             }
 
             if isDuplicate {
-                Logger.persistence.debug("Skipping duplicate incident for monitor \(record.monitorId)")
+                print("Persistence: Skipping duplicate incident for monitor \(record.monitorId)")
                 return
             }
         } catch {
-            Logger.persistence.error("Dedup check failed for monitor \(record.monitorId): \(error.localizedDescription)")
+            print("Persistence: Dedup check failed for monitor \(record.monitorId): \(error.localizedDescription)")
         }
 
         modelContext.insert(record)
         do {
             try modelContext.save()
         } catch {
-            Logger.persistence.error("Failed to save incident for '\(record.monitorName)': \(error.localizedDescription)")
+            print("Persistence: Failed to save incident for '\(record.monitorName)': \(error.localizedDescription)")
             modelContext.delete(record)
         }
     }
 
-    func fetchRecentIncidents(
+    public func fetchRecentIncidents(
         serverConnectionId: UUID? = nil,
-        limit: Int = AppConstants.maxIncidentHistoryDisplay
+        limit: Int = 100
     ) -> [IncidentRecord] {
         do {
             let descriptor: FetchDescriptor<IncidentRecord>
@@ -78,14 +74,14 @@ final class PersistenceManager {
             boundedDescriptor.fetchLimit = limit
             return try modelContext.fetch(boundedDescriptor)
         } catch {
-            Logger.persistence.error("Failed to fetch incidents: \(error.localizedDescription)")
+            print("Persistence: Failed to fetch incidents: \(error.localizedDescription)")
             return []
         }
     }
 
-    func purgeOldIncidents(olderThan days: Int = AppConstants.incidentRetentionDays) {
+    public func purgeOldIncidents(olderThan days: Int = 30) {
         guard let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) else {
-            Logger.persistence.error("Failed to calculate purge cutoff date")
+            print("Persistence: Failed to calculate purge cutoff date")
             return
         }
         let predicate = #Predicate<IncidentRecord> { $0.timestamp < cutoff }
@@ -93,40 +89,40 @@ final class PersistenceManager {
             try modelContext.delete(model: IncidentRecord.self, where: predicate)
             try modelContext.save()
         } catch {
-            Logger.persistence.error("Failed to purge old incidents: \(error.localizedDescription)")
+            print("Persistence: Failed to purge old incidents: \(error.localizedDescription)")
         }
     }
 
     // MARK: - Monitor Preferences
 
-    func fetchAllPreferences() -> [String: MonitorPreference] {
+    public func fetchAllPreferences() -> [String: MonitorPreference] {
         let descriptor = FetchDescriptor<MonitorPreference>()
         do {
             let results = try modelContext.fetch(descriptor)
             return Dictionary(results.map { ($0.compositeKey, $0) }, uniquingKeysWith: { _, new in new })
         } catch {
-            Logger.persistence.error("Failed to fetch preferences: \(error.localizedDescription)")
+            print("Persistence: Failed to fetch preferences: \(error.localizedDescription)")
             return [:]
         }
     }
 
-    func togglePin(for monitorId: String, serverConnectionId: UUID) {
+    public func togglePin(for monitorId: String, serverConnectionId: UUID) {
         let pref = fetchOrCreatePreference(for: monitorId, serverConnectionId: serverConnectionId)
         pref.pin()
         do {
             try modelContext.save()
         } catch {
-            Logger.persistence.error("Failed to save pin preference: \(error.localizedDescription)")
+            print("Persistence: Failed to save pin preference: \(error.localizedDescription)")
         }
     }
 
-    func toggleHidden(for monitorId: String, serverConnectionId: UUID) {
+    public func toggleHidden(for monitorId: String, serverConnectionId: UUID) {
         let pref = fetchOrCreatePreference(for: monitorId, serverConnectionId: serverConnectionId)
         pref.hide()
         do {
             try modelContext.save()
         } catch {
-            Logger.persistence.error("Failed to save hide preference: \(error.localizedDescription)")
+            print("Persistence: Failed to save hide preference: \(error.localizedDescription)")
         }
     }
 
@@ -141,7 +137,7 @@ final class PersistenceManager {
                 return existing
             }
         } catch {
-            Logger.persistence.error("Failed to fetch preference for monitor \(monitorId): \(error.localizedDescription)")
+            print("Persistence: Failed to fetch preference for monitor \(monitorId): \(error.localizedDescription)")
         }
 
         let pref = MonitorPreference(monitorId: monitorId, serverConnectionId: serverConnectionId)

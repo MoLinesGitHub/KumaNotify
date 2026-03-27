@@ -94,8 +94,10 @@ final class DashboardViewModel {
         maintenances = result.maintenances
         lastFetchTime = Date()
         errorMessage = nil
-        loadPreferences()
-        loadLastIncidentDate()
+        Task {
+            await loadPreferences()
+            await loadLastIncidentDate()
+        }
     }
 
     func applyStatusPageResult(_ result: StatusPageResult, for connectionId: UUID) {
@@ -121,29 +123,39 @@ final class DashboardViewModel {
 
     // MARK: - Persistence
 
-    func loadPreferences() {
-        monitorPreferences = persistence?.fetchAllPreferences() ?? [:]
+    func loadPreferences() async {
+        if let persistence {
+            monitorPreferences = await persistence.fetchAllPreferences()
+        }
     }
 
-    func loadIncidentHistory() {
-        incidentRecords = persistence?.fetchRecentIncidents(serverConnectionId: connection.id) ?? []
+    func loadIncidentHistory() async {
+        if let persistence {
+            incidentRecords = await persistence.fetchRecentIncidents(serverConnectionId: connection.id)
+        }
     }
 
-    func loadLastIncidentDate() {
-        let recent = persistence?.fetchRecentIncidents(serverConnectionId: connection.id, limit: 1) ?? []
-        lastIncidentDate = recent.first?.timestamp
+    func loadLastIncidentDate() async {
+        if let persistence {
+            let recent = await persistence.fetchRecentIncidents(serverConnectionId: connection.id, limit: 1)
+            lastIncidentDate = recent.first?.timestamp
+        }
     }
 
     func togglePin(for monitor: UnifiedMonitor) {
         let connectionId = connection.id
-        persistence?.togglePin(for: monitor.id, serverConnectionId: connectionId)
-        loadPreferences()
+        Task {
+            await persistence?.togglePin(for: monitor.id, serverConnectionId: connectionId)
+            await loadPreferences()
+        }
     }
 
     func toggleHidden(for monitor: UnifiedMonitor) {
         let connectionId = connection.id
-        persistence?.toggleHidden(for: monitor.id, serverConnectionId: connectionId)
-        loadPreferences()
+        Task {
+            await persistence?.toggleHidden(for: monitor.id, serverConnectionId: connectionId)
+            await loadPreferences()
+        }
     }
 
     func toggleAcknowledge(for monitor: UnifiedMonitor) {
@@ -188,8 +200,9 @@ final class DashboardViewModel {
 
     // MARK: - Export
 
-    func exportIncidentsCSV() -> URL? {
-        let records = persistence?.fetchRecentIncidents(serverConnectionId: connection.id) ?? []
+    func exportIncidentsCSV() async -> URL? {
+        guard let persistence else { return nil }
+        let records = await persistence.fetchRecentIncidents(serverConnectionId: connection.id)
         guard !records.isEmpty else { return nil }
 
         var csv = "Timestamp,Monitor,Server,Type,Duration (s)\n"
@@ -210,8 +223,9 @@ final class DashboardViewModel {
         return writeToTempFile(content: csv, filename: "kuma-incidents.csv")
     }
 
-    func exportIncidentsJSON() -> URL? {
-        let records = persistence?.fetchRecentIncidents(serverConnectionId: connection.id) ?? []
+    func exportIncidentsJSON() async -> URL? {
+        guard let persistence else { return nil }
+        let records = await persistence.fetchRecentIncidents(serverConnectionId: connection.id)
         guard !records.isEmpty else { return nil }
 
         let isoFormatter = ISO8601DateFormatter()
@@ -232,6 +246,7 @@ final class DashboardViewModel {
         guard let data = try? JSONSerialization.data(withJSONObject: items, options: [.prettyPrinted, .sortedKeys]) else { return nil }
         return writeToTempFile(data: data, filename: "kuma-incidents.json")
     }
+
 
     // MARK: - Share
 

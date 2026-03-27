@@ -335,11 +335,12 @@ struct SettingsView: View {
                             }
 
                             settingsStore.notificationsEnabled = true
-                            NotificationManager.shared.sendTestNotification(
+                            await NotificationManager.shared.sendTestNotification(
                                 soundOption: settingsStore.notificationSound
                             )
                         }
                     }
+
                 }
             }
 

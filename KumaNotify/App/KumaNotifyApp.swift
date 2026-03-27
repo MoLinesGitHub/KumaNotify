@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 import WidgetKit
-import os
 
 enum KumaNotifyAppLaunchBehavior: Equatable {
     case restoreMonitoring
@@ -139,7 +138,7 @@ struct KumaNotifyApp: App {
             let pm = try PersistenceManager()
             _persistence = State(initialValue: pm)
         } catch {
-            Logger.app.error("PersistenceManager failed to initialize: \(error.localizedDescription)")
+            print("App: PersistenceManager failed to initialize: \(error.localizedDescription)")
             _persistence = State(initialValue: nil)
         }
 
@@ -264,7 +263,9 @@ struct KumaNotifyApp: App {
     }
 
     private func bootstrapMonitoring(_ menuBarVM: MenuBarViewModel) {
-        persistence?.purgeOldIncidents()
+        Task {
+            await persistence?.purgeOldIncidents()
+        }
         menuBarVM.startPolling()
     }
 

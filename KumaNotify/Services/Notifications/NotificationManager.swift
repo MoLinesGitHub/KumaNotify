@@ -1,23 +1,21 @@
 import Foundation
 import AppKit
 import UserNotifications
-import os
 
-enum NotificationAuthorizationStatus: String, Sendable {
+public enum NotificationAuthorizationStatus: String, Sendable {
     case notDetermined
     case denied
     case authorized
 }
 
-@MainActor
-protocol NotificationManaging: AnyObject {
+public protocol NotificationManaging: Sendable {
     func sendDownAlert(
         serverConnectionId: UUID,
         monitorId: String,
         monitorName: String,
         serverName: String,
         soundOption: NotificationSoundOption
-    )
+    ) async
     func sendRecoveryAlert(
         serverConnectionId: UUID,
         monitorId: String,
@@ -25,25 +23,26 @@ protocol NotificationManaging: AnyObject {
         serverName: String,
         downDuration: TimeInterval?,
         soundOption: NotificationSoundOption
-    )
+    ) async
     func sendCertExpiryWarning(
         serverConnectionId: UUID,
         monitorId: String,
         monitorName: String,
         daysRemaining: Int,
         soundOption: NotificationSoundOption
-    )
+    ) async
+    func sendTestNotification(soundOption: NotificationSoundOption) async
 }
 
-final class NotificationManager: NSObject, Sendable, NotificationManaging {
-    static let shared = NotificationManager()
+public actor NotificationManager: NotificationManaging {
+    public static let shared = NotificationManager()
 
     private let requestAuthorizationHandler: @Sendable () async throws -> Bool
     private let authorizationStatusHandler: @Sendable () async -> UNAuthorizationStatus
     private let openURLHandler: @Sendable (URL) -> Bool
     private let scheduleRequestHandler: @Sendable (UNNotificationRequest) -> Void
 
-    init(
+    public init(
         requestAuthorizationHandler: @escaping @Sendable () async throws -> Bool = {
             try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound, .badge])
@@ -52,12 +51,16 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
             await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         },
         openURLHandler: @escaping @Sendable (URL) -> Bool = { url in
-            NSWorkspace.shared.open(url)
+            // Open URL must happen on MainActor
+            Task { @MainActor in
+                _ = NSWorkspace.shared.open(url)
+            }
+            return true
         },
         scheduleRequestHandler: @escaping @Sendable (UNNotificationRequest) -> Void = { request in
             UNUserNotificationCenter.current().add(request) { error in
                 if let error {
-                    Logger.app.error("Failed to deliver notification '\(request.identifier)': \(error.localizedDescription)")
+                    print("Notifications: Failed to deliver notification '\(request.identifier)': \(error.localizedDescription)")
                 }
             }
         }
@@ -68,29 +71,29 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
         self.scheduleRequestHandler = scheduleRequestHandler
     }
 
-    static func downAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
+    public static func downAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
         "down_\(serverConnectionId.uuidString)_\(monitorId)"
     }
 
-    static func recoveryAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
+    public static func recoveryAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
         "recovery_\(serverConnectionId.uuidString)_\(monitorId)"
     }
 
-    static func certExpiryIdentifier(serverConnectionId: UUID, monitorId: String, daysRemaining: Int) -> String {
+    public static func certExpiryIdentifier(serverConnectionId: UUID, monitorId: String, daysRemaining: Int) -> String {
         "cert_\(serverConnectionId.uuidString)_\(monitorId)_\(daysRemaining)"
     }
 
-    func requestPermission() async -> NotificationAuthorizationStatus {
+    public func requestPermission() async -> NotificationAuthorizationStatus {
         do {
             _ = try await requestAuthorizationHandler()
             return await notificationAuthorizationStatus()
         } catch {
-            Logger.app.error("Notification permission request failed: \(error.localizedDescription)")
+            print("Notifications: Notification permission request failed: \(error.localizedDescription)")
             return .denied
         }
     }
 
-    func notificationAuthorizationStatus() async -> NotificationAuthorizationStatus {
+    public func notificationAuthorizationStatus() async -> NotificationAuthorizationStatus {
         switch await authorizationStatusHandler() {
         case .authorized, .provisional, .ephemeral:
             return .authorized
@@ -101,28 +104,27 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
         }
     }
 
-    func notificationsAuthorized() async -> Bool {
+    public func notificationsAuthorized() async -> Bool {
         await notificationAuthorizationStatus() == .authorized
     }
 
     @discardableResult
-    func openSystemNotificationSettings() -> Bool {
-        if let deepLink = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension"),
-           openURLHandler(deepLink) {
-            return true
+    public func openSystemNotificationSettings() -> Bool {
+        if let deepLink = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+            return openURLHandler(deepLink)
         }
 
         let systemSettingsURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
         return openURLHandler(systemSettingsURL)
     }
 
-    func sendDownAlert(
+    public func sendDownAlert(
         serverConnectionId: UUID,
         monitorId: String,
         monitorName: String,
         serverName: String,
         soundOption: NotificationSoundOption = .system
-    ) {
+    ) async {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Down")
         content.subtitle = monitorName
@@ -137,14 +139,14 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
         )
     }
 
-    func sendRecoveryAlert(
+    public func sendRecoveryAlert(
         serverConnectionId: UUID,
         monitorId: String,
         monitorName: String,
         serverName: String,
         downDuration: TimeInterval?,
         soundOption: NotificationSoundOption = .system
-    ) {
+    ) async {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Monitor Recovered")
         content.subtitle = monitorName
@@ -165,13 +167,13 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
         )
     }
 
-    func sendCertExpiryWarning(
+    public func sendCertExpiryWarning(
         serverConnectionId: UUID,
         monitorId: String,
         monitorName: String,
         daysRemaining: Int,
         soundOption: NotificationSoundOption = .system
-    ) {
+    ) async {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "SSL Certificate Expiring")
         content.subtitle = monitorName
@@ -189,7 +191,7 @@ final class NotificationManager: NSObject, Sendable, NotificationManaging {
         )
     }
 
-    func sendTestNotification(soundOption: NotificationSoundOption = .system) {
+    public func sendTestNotification(soundOption: NotificationSoundOption = .system) async {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Kuma Notify")
         content.body = String(localized: "Test notification — sound is working!")

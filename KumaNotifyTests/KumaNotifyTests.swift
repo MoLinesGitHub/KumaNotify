@@ -1119,7 +1119,7 @@ final class KumaNotifyTests: XCTestCase {
             statusPageSlug: "primary"
         )
 
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "secondary-api",
             monitorName: "Secondary API",
             serverConnectionId: secondaryID,
@@ -1127,7 +1127,7 @@ final class KumaNotifyTests: XCTestCase {
             transitionType: .wentDown,
             timestamp: Date().addingTimeInterval(-300)
         ))
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "primary-api",
             monitorName: "Primary API",
             serverConnectionId: primaryID,
@@ -1143,14 +1143,14 @@ final class KumaNotifyTests: XCTestCase {
             persistence: manager
         )
 
-        viewModel.loadIncidentHistory()
-        viewModel.loadLastIncidentDate()
+        await viewModel.loadIncidentHistory()
+        await viewModel.loadLastIncidentDate()
 
         XCTAssertEqual(viewModel.incidentRecords.count, 1)
         XCTAssertEqual(viewModel.incidentRecords.first?.serverConnectionId, primaryID)
         XCTAssertNotNil(viewModel.lastIncidentDate)
 
-        let exportURL = try XCTUnwrap(viewModel.exportIncidentsJSON())
+        let exportURL = try await XCTUnwrap(viewModel.exportIncidentsJSON())
         defer { try? FileManager.default.removeItem(at: exportURL) }
 
         let data = try Data(contentsOf: exportURL)
@@ -1163,7 +1163,7 @@ final class KumaNotifyTests: XCTestCase {
     }
 
     @MainActor
-    func testDashboardViewModelEscapesCSVFieldsWithCommasQuotesAndNewlines() throws {
+    func testDashboardViewModelEscapesCSVFieldsWithCommasQuotesAndNewlines() async throws {
         let (suiteName, store) = makeSettingsStore()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
         let manager = try PersistenceManager(isStoredInMemoryOnly: true)
@@ -1175,7 +1175,7 @@ final class KumaNotifyTests: XCTestCase {
             statusPageSlug: "primary"
         )
 
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "api",
             monitorName: "API, \"Edge\"",
             serverConnectionId: connectionID,
@@ -1191,13 +1191,14 @@ final class KumaNotifyTests: XCTestCase {
             persistence: manager
         )
 
-        let exportURL = try XCTUnwrap(viewModel.exportIncidentsCSV())
+        let exportURL = try await XCTUnwrap(viewModel.exportIncidentsCSV())
         defer { try? FileManager.default.removeItem(at: exportURL) }
 
         let csv = try String(contentsOf: exportURL, encoding: .utf8)
         XCTAssertTrue(csv.contains("\"API, \"\"Edge\"\"\""))
         XCTAssertTrue(csv.contains("\"Primary\nEU\""))
-        XCTAssertTrue(csv.contains(",recovered,42"))
+        XCTAssertTrue(csv.contains(",recovered,42,1970-01-01"))
+
     }
 
     @MainActor

@@ -268,7 +268,7 @@ final class MenuBarViewModel {
             if let daysRemaining = monitor.certExpiryDays,
                (0..<AppConstants.certExpiryWarningDays).contains(daysRemaining) {
                 if shouldSendNotifications, lastCertExpiryWarningDays[key] != daysRemaining {
-                    notifications.sendCertExpiryWarning(
+                    await notifications.sendCertExpiryWarning(
                         serverConnectionId: connection.id,
                         monitorId: monitor.id,
                         monitorName: monitor.name,
@@ -284,13 +284,14 @@ final class MenuBarViewModel {
             if previousStatus == .up && monitor.currentStatus == .down {
                 monitorDownSince[key] = Date()
                 if shouldSendNotifications && !isAcknowledged {
-                    notifications.sendDownAlert(
+                    await notifications.sendDownAlert(
                         serverConnectionId: connection.id,
                         monitorId: monitor.id, monitorName: monitor.name,
                         serverName: connection.name, soundOption: soundOption
                     )
                 }
-                persistence?.recordIncident(IncidentRecord(
+
+                await persistence?.recordIncident(IncidentRecord(
                     monitorId: monitor.id,
                     monitorName: monitor.name,
                     serverConnectionId: connection.id,
@@ -310,7 +311,7 @@ final class MenuBarViewModel {
                         soundOption: soundOption
                     )
                 }
-                persistence?.recordIncident(IncidentRecord(
+                await persistence?.recordIncident(IncidentRecord(
                     monitorId: monitor.id,
                     monitorName: monitor.name,
                     serverConnectionId: connection.id,
@@ -319,6 +320,7 @@ final class MenuBarViewModel {
                     downDuration: downDuration
                 ))
             }
+
 
             previousMonitorStatuses[key] = monitor.currentStatus
         }

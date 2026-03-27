@@ -257,12 +257,15 @@ struct DashboardView: View {
 
             toolbarIcon("clock.arrow.circlepath", label: String(localized: "Incident History")) {
                 if isPro {
-                    dashboardVM.loadIncidentHistory()
-                    dashboardVM.showIncidentHistory = true
+                    Task {
+                        await dashboardVM.loadIncidentHistory()
+                        dashboardVM.showIncidentHistory = true
+                    }
                 } else {
                     showPaywall = true
                 }
             }
+
             .accessibilityIdentifier("dashboard.incidentHistoryButton")
 
             toolbarIcon("doc.on.doc", label: String(localized: "Copy Summary")) {

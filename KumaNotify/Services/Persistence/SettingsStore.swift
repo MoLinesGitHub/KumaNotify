@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 import ServiceManagement
-import os
 
 @MainActor
 @Observable
@@ -122,7 +121,7 @@ final class SettingsStore {
             do {
                 return try JSONDecoder().decode([ServerConnection].self, from: data)
             } catch {
-                Logger.app.error("Failed to decode ServerConnections: \(error.localizedDescription)")
+                print("SettingsStore: Failed to decode ServerConnections: \(error.localizedDescription)")
                 return []
             }
         }
@@ -134,7 +133,7 @@ final class SettingsStore {
                 // Clean up legacy key after migration
                 defaults.removeObject(forKey: "serverConnection")
             } catch {
-                Logger.app.error("Failed to encode ServerConnections: \(error.localizedDescription)")
+                print("SettingsStore: Failed to encode ServerConnections: \(error.localizedDescription)")
             }
         }
     }
@@ -231,7 +230,7 @@ final class SettingsStore {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                Logger.app.error("Failed to \(newValue ? "enable" : "disable") launch at login: \(error.localizedDescription)")
+                print("SettingsStore: Failed to toggle launch at login: \(error.localizedDescription)")
             }
         }
     }
