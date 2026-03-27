@@ -198,7 +198,14 @@ final class DashboardViewModel {
             let ts = isoFormatter.string(from: record.timestamp)
             let type = record.transitionType.rawValue
             let duration = record.downDuration.map { String(Int($0)) } ?? ""
-            csv += "\(ts),\(record.monitorName),\(record.serverName),\(type),\(duration)\n"
+            let fields = [
+                ts,
+                record.monitorName,
+                record.serverName,
+                type,
+                duration
+            ].map(Self.csvEscapedField)
+            csv += fields.joined(separator: ",") + "\n"
         }
         return writeToTempFile(content: csv, filename: "kuma-incidents.csv")
     }
@@ -235,9 +242,13 @@ final class DashboardViewModel {
     func buildEmailReport() -> URL? {
         let text = buildSummaryText()
         let subject = String(localized: "Kuma Notify — Status Report")
-        let encoded = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let subjectEncoded = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        return URL(string: "mailto:?subject=\(subjectEncoded)&body=\(encoded)")
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: subject),
+            URLQueryItem(name: "body", value: text)
+        ]
+        return components.url
     }
 
     // MARK: - Helpers
@@ -267,6 +278,15 @@ final class DashboardViewModel {
         } catch {
             return nil
         }
+    }
+
+    private static func csvEscapedField(_ value: String) -> String {
+        guard value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r") else {
+            return value
+        }
+
+        let escapedQuotes = value.replacingOccurrences(of: "\"", with: "\"\"")
+        return "\"\(escapedQuotes)\""
     }
 
     private func recomputeDerivedState() {

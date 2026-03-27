@@ -1069,6 +1069,91 @@ final class KumaNotifyTests: XCTestCase {
     }
 
     @MainActor
+    func testDashboardViewModelEscapesCSVFieldsWithCommasQuotesAndNewlines() throws {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let manager = try PersistenceManager(isStoredInMemoryOnly: true)
+        let connectionID = UUID()
+        let connection = ServerConnection(
+            id: connectionID,
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+
+        manager.recordIncident(IncidentRecord(
+            monitorId: "api",
+            monitorName: "API, \"Edge\"",
+            serverConnectionId: connectionID,
+            serverName: "Primary\nEU",
+            transitionType: .recovered,
+            timestamp: Date(timeIntervalSince1970: 0),
+            downDuration: 42
+        ))
+
+        let viewModel = DashboardViewModel(
+            connection: connection,
+            settingsStore: store,
+            persistence: manager
+        )
+
+        let exportURL = try XCTUnwrap(viewModel.exportIncidentsCSV())
+        defer { try? FileManager.default.removeItem(at: exportURL) }
+
+        let csv = try String(contentsOf: exportURL, encoding: .utf8)
+        XCTAssertTrue(csv.contains("\"API, \"\"Edge\"\"\""))
+        XCTAssertTrue(csv.contains("\"Primary\nEU\""))
+        XCTAssertTrue(csv.contains(",recovered,42"))
+    }
+
+    @MainActor
+    func testDashboardViewModelBuildEmailReportEncodesBodyWithReservedCharacters() throws {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let viewModel = DashboardViewModel(connection: connection, settingsStore: store)
+
+        viewModel.groups = [
+            UnifiedGroup(
+                id: "g1",
+                name: "Core & Edge",
+                weight: 0,
+                monitors: [
+                    UnifiedMonitor(
+                        id: "api",
+                        name: "API & Edge?",
+                        type: "http",
+                        currentStatus: .up,
+                        latestPing: 90,
+                        uptime24h: 1,
+                        uptime7d: 1,
+                        uptime30d: 1,
+                        certExpiryDays: nil,
+                        validCert: nil,
+                        url: nil,
+                        lastStatusChange: nil
+                    )
+                ]
+            )
+        ]
+
+        let url = try XCTUnwrap(viewModel.buildEmailReport())
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let subject = components.queryItems?.first(where: { $0.name == "subject" })?.value
+        let body = components.queryItems?.first(where: { $0.name == "body" })?.value
+
+        XCTAssertEqual(subject, String(localized: "Kuma Notify — Status Report"))
+        XCTAssertTrue(body?.contains("Core & Edge") == true)
+        XCTAssertTrue(body?.contains("API & Edge?") == true)
+        XCTAssertTrue(body?.contains("&") == true)
+    }
+
+    @MainActor
     func testDashboardViewModelUsesHeartbeatsFromStatusPageResultWithoutExtraFetch() async {
         let (suiteName, store) = makeSettingsStore()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
