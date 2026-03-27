@@ -112,10 +112,10 @@ struct KumaNotifyWidgetEntryView: View {
 
     private func statusColor(_ key: String) -> Color {
         switch key {
-        case "green": .green
-        case "yellow": .yellow
-        case "red": .red
-        default: .gray
+        case "green": .appStatusUp
+        case "yellow": .appStatusDegraded
+        case "red": .appStatusDown
+        default: .appStatusOffline
         }
     }
 }

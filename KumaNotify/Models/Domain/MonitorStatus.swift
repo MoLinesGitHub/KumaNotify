@@ -8,9 +8,9 @@ enum MonitorStatus: Int, Codable, Sendable, CaseIterable {
 
     var color: Color {
         switch self {
-        case .up: .green
-        case .down: .red
-        case .pending: .yellow
+        case .up: .appStatusUp
+        case .down: .appStatusDown
+        case .pending: .appStatusDegraded
         case .maintenance: .blue
         }
     }

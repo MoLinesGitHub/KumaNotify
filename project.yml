@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.molinesdesigns
   deploymentTarget:
     macOS: "14.0"
+    watchOS: "11.0"
   xcodeVersion: "26.4"
   generateEmptyDirectories: true
   groupSortPosition: top
@@ -79,6 +80,7 @@ targets:
     sources:
       - path: KumaNotifyWidget
       - path: KumaNotifyShared
+      - path: KumaNotify/Resources/Assets.xcassets
       - path: KumaNotify/Resources/Localizable.xcstrings
     settings:
       base:
@@ -93,6 +95,32 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
           - group.com.molinesdesigns.kuma-notify
+
+  KumaNotifyWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: KumaNotifyWatch
+      - path: KumaNotifyShared
+      - path: KumaNotify/Resources/Localizable.xcstrings
+      - path: KumaNotify/Resources/Assets.xcassets
+      - path: KumaNotify/Models/Domain/HeartbeatRepresentable.swift
+      - path: KumaNotify/Models/Domain/MonitorGroupRepresentable.swift
+      - path: KumaNotify/Models/Domain/MonitorRepresentable.swift
+      - path: KumaNotify/Models/Domain/MonitorStatus.swift
+      - path: KumaNotify/Models/Domain/ServerConnection.swift
+      - path: KumaNotify/Models/UptimeKuma
+      - path: KumaNotify/Services/Monitoring
+      - path: KumaNotify/Services/Networking/APIError.swift
+      - path: KumaNotify/Services/Networking/HTTPClient.swift
+      - path: KumaNotify/Services/UptimeKuma
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.watch
+        PRODUCT_NAME: KumaNotifyWatch
+        PRODUCT_MODULE_NAME: KumaNotifyWatch
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: WatchAppIcon
 
   KumaNotifyTests:
     type: bundle.unit-test

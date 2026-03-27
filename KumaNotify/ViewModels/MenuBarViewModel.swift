@@ -31,6 +31,7 @@ final class MenuBarViewModel {
     private var previousMonitorStatuses: [String: MonitorStatus] = [:]
     private var monitorDownSince: [String: Date] = [:]
     private var lastCertExpiryWarningDays: [String: Int] = [:]
+    private var lastDownAlertSoundAt: Date?
 
     var iconStyle: MenuBarIconStyle { settingsStore.menuBarIconStyle }
     var statusColor: Color { overallStatus.color }
@@ -287,10 +288,11 @@ final class MenuBarViewModel {
             if previousStatus == .up && monitor.currentStatus == .down {
                 monitorDownSince[key] = Date()
                 if shouldSendNotifications && !isAcknowledged {
+                    let downAlertSoundOption = nextDownAlertSoundOption(default: soundOption)
                     await notifications.sendDownAlert(
                         serverConnectionId: connection.id,
                         monitorId: monitor.id, monitorName: monitor.name,
-                        serverName: connection.name, soundOption: soundOption
+                        serverName: connection.name, soundOption: downAlertSoundOption
                     )
                 }
 
@@ -327,6 +329,23 @@ final class MenuBarViewModel {
 
             previousMonitorStatuses[key] = monitor.currentStatus
         }
+    }
+
+    private func nextDownAlertSoundOption(default soundOption: NotificationSoundOption) -> NotificationSoundOption {
+        let cooldown = settingsStore.downAlertSoundCooldown
+        guard cooldown > 0 else {
+            lastDownAlertSoundAt = Date()
+            return soundOption
+        }
+
+        let now = Date()
+        if let lastDownAlertSoundAt,
+           now.timeIntervalSince(lastDownAlertSoundAt) < cooldown {
+            return .silent
+        }
+
+        lastDownAlertSoundAt = now
+        return soundOption
     }
 
     private func pruneMonitorState(for connectionId: UUID, activeMonitorIDs: Set<String>) {

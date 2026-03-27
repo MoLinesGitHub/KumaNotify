@@ -344,6 +344,19 @@ struct SettingsView: View {
                         }
                     }
 
+                    Picker("Burst sound cooldown", selection: Binding(
+                        get: { DownAlertSoundCooldownOption.from(seconds: settingsStore.downAlertSoundCooldown) },
+                        set: { settingsStore.downAlertSoundCooldown = $0.rawValue }
+                    )) {
+                        ForEach(DownAlertSoundCooldownOption.allCases, id: \.self) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+
+                    Text("Only the first down alert plays sound during this window.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
                     Button("Test Notification") {
                         Task { @MainActor in
                             var status = settingsStore.notificationAuthorizationStatus

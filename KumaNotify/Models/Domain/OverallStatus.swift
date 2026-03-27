@@ -14,10 +14,10 @@ enum OverallStatus: Sendable {
 
     var color: Color {
         switch self {
-        case .allUp: .green
-        case .degraded: .yellow
-        case .someDown: .red
-        case .unreachable: .gray
+        case .allUp: .appStatusUp
+        case .degraded: .appStatusDegraded
+        case .someDown: .appStatusDown
+        case .unreachable: .appStatusOffline
         }
     }
 

@@ -22,6 +22,7 @@ final class SettingsStore {
             "iconStyle": MenuBarIconStyle.sfSymbol.rawValue,
             "notificationsEnabled": false,
             "notificationAuthorizationStatus": NotificationAuthorizationStatus.notDetermined.rawValue,
+            "downAlertSoundCooldown": AppConstants.downAlertSoundCooldown,
         ])
     }
 
@@ -72,6 +73,11 @@ final class SettingsStore {
     var notificationSound: NotificationSoundOption {
         get { NotificationSoundOption(rawValue: defaults.string(forKey: "notificationSound") ?? "") ?? .system }
         set { defaults.set(newValue.rawValue, forKey: "notificationSound") }
+    }
+
+    var downAlertSoundCooldown: TimeInterval {
+        get { defaults.double(forKey: "downAlertSoundCooldown") }
+        set { defaults.set(newValue, forKey: "downAlertSoundCooldown") }
     }
 
     /// DND end time. If in the future, DND is active.
@@ -245,12 +251,35 @@ final class SettingsStore {
 
 enum NotificationSoundOption: String, CaseIterable, Sendable {
     case system = "system"
+    case softChime = "soft_chime"
+    case alertPulse = "alert_pulse"
+    case warningBeacon = "warning_beacon"
+    case brightPing = "bright_ping"
     case silent = "silent"
 
     var label: String {
         switch self {
         case .system: String(localized: "System Sound")
+        case .softChime: String(localized: "Soft Chime")
+        case .alertPulse: String(localized: "Alert Pulse")
+        case .warningBeacon: String(localized: "Warning Beacon")
+        case .brightPing: String(localized: "Bright Ping")
         case .silent: String(localized: "Silent")
+        }
+    }
+
+    var bundledFileName: String? {
+        switch self {
+        case .system, .silent:
+            nil
+        case .softChime:
+            "soft-chime.wav"
+        case .alertPulse:
+            "alert-pulse.wav"
+        case .warningBeacon:
+            "warning-beacon.wav"
+        case .brightPing:
+            "bright-ping.wav"
         }
     }
 }
@@ -279,6 +308,26 @@ enum DndPreset: String, CaseIterable, Identifiable {
         case .indefinite:
             Date.distantFuture
         }
+    }
+}
+
+enum DownAlertSoundCooldownOption: Double, CaseIterable, Sendable {
+    case everyAlert = 0
+    case tenSeconds = 10
+    case thirtySeconds = 30
+    case oneMinute = 60
+
+    var label: String {
+        switch self {
+        case .everyAlert: String(localized: "Every alert")
+        case .tenSeconds: String(localized: "10 seconds")
+        case .thirtySeconds: String(localized: "30 seconds")
+        case .oneMinute: String(localized: "1 minute")
+        }
+    }
+
+    static func from(seconds: TimeInterval) -> DownAlertSoundCooldownOption {
+        DownAlertSoundCooldownOption(rawValue: seconds) ?? .thirtySeconds
     }
 }
 

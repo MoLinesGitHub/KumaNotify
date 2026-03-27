@@ -130,7 +130,7 @@ actor NotificationManager: NotificationManaging {
         content.title = String(localized: "Monitor Down")
         content.subtitle = monitorName
         content.body = String(format: String(localized: "'%@' on %@ is not responding."), monitorName, serverName)
-        content.sound = soundOption == .silent ? nil : .default
+        content.sound = Self.downAlertSound(for: soundOption)
         content.categoryIdentifier = "MONITOR_DOWN"
         content.interruptionLevel = .timeSensitive
 
@@ -159,7 +159,7 @@ actor NotificationManager: NotificationManaging {
             content.body = String(format: String(localized: "'%@' on %@ is back up."), monitorName, serverName)
         }
 
-        content.sound = soundOption == .silent ? nil : .default
+        content.sound = Self.notificationSound(for: soundOption)
         content.categoryIdentifier = "MONITOR_RECOVERY"
 
         scheduleNotification(
@@ -179,7 +179,7 @@ actor NotificationManager: NotificationManaging {
         content.title = String(localized: "SSL Certificate Expiring")
         content.subtitle = monitorName
         content.body = String(format: String(localized: "Certificate for '%@' expires in %lld days."), monitorName, daysRemaining)
-        content.sound = soundOption == .silent ? nil : .default
+        content.sound = Self.notificationSound(for: soundOption)
         content.categoryIdentifier = "CERT_EXPIRY"
 
         scheduleNotification(
@@ -196,7 +196,7 @@ actor NotificationManager: NotificationManaging {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Kuma Notify")
         content.body = String(localized: "Test notification — sound is working!")
-        content.sound = soundOption == .silent ? nil : .default
+        content.sound = Self.notificationSound(for: soundOption)
 
         scheduleNotification(id: "test_\(UUID().uuidString)", content: content)
     }
@@ -213,4 +213,29 @@ actor NotificationManager: NotificationManaging {
         f.maximumUnitCount = 2
         return f
     }()
+
+    private static let downAlertSoundName = UNNotificationSoundName(rawValue: "monitor-down.caf")
+
+    private static func downAlertSound(for option: NotificationSoundOption) -> UNNotificationSound? {
+        switch option {
+        case .silent:
+            return nil
+        default:
+            return UNNotificationSound(named: downAlertSoundName)
+        }
+    }
+
+    private static func notificationSound(for option: NotificationSoundOption) -> UNNotificationSound? {
+        switch option {
+        case .silent:
+            return nil
+        case .system:
+            return .default
+        case .softChime, .alertPulse, .warningBeacon, .brightPing:
+            guard let fileName = option.bundledFileName else {
+                return .default
+            }
+            return UNNotificationSound(named: UNNotificationSoundName(rawValue: fileName))
+        }
+    }
 }

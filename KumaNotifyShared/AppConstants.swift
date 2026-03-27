@@ -2,6 +2,7 @@ import Foundation
 
 enum AppConstants {
     static let appGroupId = "group.com.molinesdesigns.kuma-notify"
+    static let watchConnectionDefaultsKey = "watchServerConnection"
     static let proProductId = "com.molinesdesigns.kumanotify.pro"
     static let widgetKind = "com.molinesdesigns.kumanotify.widget"
     static let defaultPollingInterval: TimeInterval = 60
@@ -11,6 +12,7 @@ enum AppConstants {
     static let degradedPingThreshold = 500
     static let degradedUptimeThreshold = 0.99
     static let certExpiryWarningDays = 30
+    static let downAlertSoundCooldown: TimeInterval = 30
     static let incidentRetentionDays = 90
     static let maxIncidentHistoryDisplay = 50
 }

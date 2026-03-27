@@ -1656,6 +1656,16 @@
         }
       }
     },
+    "Soft Chime" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Campanilla suave"
+          }
+        }
+      }
+    },
     "Silent" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1674,6 +1684,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sonido"
+          }
+        }
+      }
+    },
+    "Alert Pulse" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pulso de alerta"
+          }
+        }
+      }
+    },
+    "Bright Ping" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ping brillante"
+          }
+        }
+      }
+    },
+    "Burst sound cooldown" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cooldown de sonido en ráfaga"
+          }
+        }
+      }
+    },
+    "If several monitors go down in a row, only the first down alert will play sound during this cooldown window." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si varios monitores se caen seguidos, solo la primera alerta de caída reproducirá sonido durante esta ventana de cooldown."
           }
         }
       }
@@ -1740,6 +1790,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sonido del sistema"
+          }
+        }
+      }
+    },
+    "Warning Beacon" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baliza de aviso"
           }
         }
       }

@@ -115,6 +115,7 @@ final class KumaNotifyTests: XCTestCase {
     @MainActor
     final class NotificationSpy: NotificationManaging {
         private(set) var downAlerts: [(UUID, String)] = []
+        private(set) var downAlertSoundOptions: [NotificationSoundOption] = []
         private(set) var recoveryAlerts: [(UUID, String)] = []
         private(set) var certExpiryWarnings: [(UUID, String, Int)] = []
         private(set) var testNotificationCount = 0
@@ -127,6 +128,7 @@ final class KumaNotifyTests: XCTestCase {
             soundOption: NotificationSoundOption
         ) async {
             downAlerts.append((serverConnectionId, monitorId))
+            downAlertSoundOptions.append(soundOption)
         }
 
         func sendRecoveryAlert(
@@ -266,6 +268,18 @@ final class KumaNotifyTests: XCTestCase {
 
         XCTAssertFalse(store.notificationsEnabled)
         XCTAssertEqual(store.notificationAuthorizationStatus, .authorized)
+    }
+
+    @MainActor
+    func testSettingsStoreDownAlertSoundCooldownDefaultsAndPersists() {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(store.downAlertSoundCooldown, AppConstants.downAlertSoundCooldown)
+
+        store.downAlertSoundCooldown = DownAlertSoundCooldownOption.oneMinute.rawValue
+
+        XCTAssertEqual(store.downAlertSoundCooldown, 60)
     }
 
     @MainActor
@@ -909,6 +923,241 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(notifications.certExpiryWarnings[1].0, connection.id)
         XCTAssertEqual(notifications.certExpiryWarnings[1].1, "api")
         XCTAssertEqual(notifications.certExpiryWarnings[1].2, 6)
+    }
+
+    @MainActor
+    func testMenuBarViewModelOnlyPlaysDownAlertSoundOnceForBurstFailures() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+        store.notificationsEnabled = true
+        store.notificationAuthorizationStatus = .authorized
+        store.notificationSound = .system
+
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        let upMonitors = [
+            UnifiedMonitor(
+                id: "api",
+                name: "API",
+                type: "http",
+                currentStatus: .up,
+                latestPing: 120,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            ),
+            UnifiedMonitor(
+                id: "web",
+                name: "Web",
+                type: "http",
+                currentStatus: .up,
+                latestPing: 130,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            )
+        ]
+
+        let downMonitors = [
+            UnifiedMonitor(
+                id: "api",
+                name: "API",
+                type: "http",
+                currentStatus: .down,
+                latestPing: nil,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            ),
+            UnifiedMonitor(
+                id: "web",
+                name: "Web",
+                type: "http",
+                currentStatus: .down,
+                latestPing: nil,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            )
+        ]
+
+        let service = SequencedMonitoringService(results: [
+            StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: upMonitors)],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: true
+            ),
+            StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: downMonitors)],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: true
+            )
+        ])
+        let notifications = NotificationSpy()
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            notifications: notifications,
+            notificationAuthorizationStatusProvider: { .authorized },
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+        await viewModel.refresh()
+
+        XCTAssertEqual(notifications.downAlerts.count, 2)
+        XCTAssertEqual(notifications.downAlertSoundOptions, [.system, .silent])
+    }
+
+    @MainActor
+    func testMenuBarViewModelCanPlayEveryDownAlertWhenCooldownDisabled() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+        store.notificationsEnabled = true
+        store.notificationAuthorizationStatus = .authorized
+        store.notificationSound = .system
+        store.downAlertSoundCooldown = DownAlertSoundCooldownOption.everyAlert.rawValue
+
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        let upMonitors = [
+            UnifiedMonitor(
+                id: "api",
+                name: "API",
+                type: "http",
+                currentStatus: .up,
+                latestPing: 120,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            ),
+            UnifiedMonitor(
+                id: "web",
+                name: "Web",
+                type: "http",
+                currentStatus: .up,
+                latestPing: 130,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            )
+        ]
+
+        let downMonitors = [
+            UnifiedMonitor(
+                id: "api",
+                name: "API",
+                type: "http",
+                currentStatus: .down,
+                latestPing: nil,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            ),
+            UnifiedMonitor(
+                id: "web",
+                name: "Web",
+                type: "http",
+                currentStatus: .down,
+                latestPing: nil,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            )
+        ]
+
+        let service = SequencedMonitoringService(results: [
+            StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: upMonitors)],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: true
+            ),
+            StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: downMonitors)],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: true
+            )
+        ])
+        let notifications = NotificationSpy()
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            notifications: notifications,
+            notificationAuthorizationStatusProvider: { .authorized },
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+        await viewModel.refresh()
+
+        XCTAssertEqual(notifications.downAlerts.count, 2)
+        XCTAssertEqual(notifications.downAlertSoundOptions, [.system, .system])
     }
 
     @MainActor
@@ -1763,6 +2012,28 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(request?.content.categoryIdentifier, "MONITOR_DOWN")
         XCTAssertEqual(request?.content.interruptionLevel, .timeSensitive)
         XCTAssertNil(request?.content.sound)
+    }
+
+    @MainActor
+    func testNotificationManagerUsesCustomEggCrackSoundForDownAlert() async throws {
+        let recorder = NotificationRequestRecorder()
+        let connectionID = UUID()
+        let manager = NotificationManager(
+            scheduleRequestHandler: { request in
+                recorder.record(request)
+            }
+        )
+
+        await manager.sendDownAlert(
+            serverConnectionId: connectionID,
+            monitorId: "web",
+            monitorName: "Web",
+            serverName: "Primary",
+            soundOption: .system
+        )
+
+        let request = try XCTUnwrap(recorder.requests.first)
+        XCTAssertNotNil(request.content.sound)
     }
 
     @MainActor
