@@ -48,7 +48,7 @@ final class MenuBarViewModel {
     }
 
     var menuBarImage: String {
-        overallStatus.sfSymbol
+        overallStatus.menuBarAssetName
     }
 
     init(

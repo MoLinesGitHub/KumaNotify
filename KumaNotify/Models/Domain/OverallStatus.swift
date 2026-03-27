@@ -30,6 +30,15 @@ enum OverallStatus: Sendable {
         }
     }
 
+    var menuBarAssetName: String {
+        switch self {
+        case .allUp: "MenuBarIconUp"
+        case .degraded: "MenuBarIconDegraded"
+        case .someDown: "MenuBarIconDown"
+        case .unreachable: "MenuBarIconOffline"
+        }
+    }
+
     var widgetKey: String {
         switch self {
         case .allUp: "allUp"

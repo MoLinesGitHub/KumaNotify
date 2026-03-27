@@ -22,6 +22,16 @@ enum MenuBarLabelLogic {
 struct MenuBarLabel: View {
     let viewModel: MenuBarViewModel
 
+    @ViewBuilder
+    private func statusIcon(size: CGFloat) -> some View {
+        Image(viewModel.menuBarImage)
+            .renderingMode(.original)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+
     private var accessibilityDescription: String {
         MenuBarLabelLogic.accessibilityDescription(
             overallStatus: viewModel.overallStatus,
@@ -34,10 +44,7 @@ struct MenuBarLabel: View {
         Group {
             switch viewModel.iconStyle {
             case .sfSymbol:
-                Image(systemName: viewModel.menuBarImage)
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(viewModel.statusColor, .primary)
-                    .symbolEffect(.pulse, isActive: viewModel.hasActiveIncident)
+                statusIcon(size: 16)
 
             case .colorDot:
                 Image(systemName: "circle.fill")
@@ -46,9 +53,7 @@ struct MenuBarLabel: View {
 
             case .textAndIcon:
                 HStack(spacing: 3) {
-                    Image(systemName: viewModel.menuBarImage)
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(viewModel.statusColor, .primary)
+                    statusIcon(size: 14)
                     if !viewModel.menuBarTitle.isEmpty {
                         Text(viewModel.menuBarTitle)
                             .monospacedDigit()

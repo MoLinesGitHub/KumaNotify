@@ -289,7 +289,7 @@ enum MenuBarIconStyle: String, Codable, CaseIterable, Sendable {
 
     var label: String {
         switch self {
-        case .sfSymbol: String(localized: "Antenna Icon")
+        case .sfSymbol: String(localized: "Kuma Icon")
         case .colorDot: String(localized: "Color Dot")
         case .textAndIcon: String(localized: "Text + Icon")
         }

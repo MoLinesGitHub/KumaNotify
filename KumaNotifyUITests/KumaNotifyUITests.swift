@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -6,6 +7,20 @@ final class KumaNotifyUITests: XCTestCase {
         let predicate = NSPredicate(format: "exists == true AND enabled == true")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func replaceText(
+        in element: XCUIElement,
+        app: XCUIApplication,
+        with value: String
+    ) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(value, forType: .string)
+
+        element.click()
+        app.typeKey("a", modifierFlags: .command)
+        app.typeKey("v", modifierFlags: .command)
     }
 
     override func setUpWithError() throws {
@@ -94,16 +109,15 @@ final class KumaNotifyUITests: XCTestCase {
         XCTAssertTrue(saveButton.exists)
         XCTAssertFalse(saveButton.isEnabled)
 
-        serverURLField.click()
-        serverURLField.typeText("https://status.example.com")
-        slugField.click()
-        slugField.typeText("production")
+        replaceText(in: serverURLField, app: app, with: "https://status.example.com")
+        replaceText(in: slugField, app: app, with: "production")
+        app.typeKey(.tab, modifierFlags: [])
 
         XCTAssertTrue(waitForEnabled(saveButton, timeout: 5))
         saveButton.click()
 
         XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
-        XCTAssertFalse(addServerButton.isEnabled)
+        XCTAssertTrue(addServerButton.isEnabled)
     }
 
     func testProductionSettingsSceneShowsServerManagementControls() {
@@ -137,12 +151,10 @@ final class KumaNotifyUITests: XCTestCase {
         let saveButton = app.buttons["settings.saveButton"]
 
         XCTAssertTrue(serverURLField.waitForExistence(timeout: 8))
-        serverURLField.click()
-        serverURLField.typeText("https://secondary.example.com")
-        slugField.click()
-        slugField.typeText("secondary")
-        displayNameField.click()
-        displayNameField.typeText("Secondary")
+        replaceText(in: serverURLField, app: app, with: "https://secondary.example.com")
+        replaceText(in: slugField, app: app, with: "secondary")
+        replaceText(in: displayNameField, app: app, with: "Secondary")
+        app.typeKey(.tab, modifierFlags: [])
 
         XCTAssertTrue(waitForEnabled(saveButton, timeout: 5))
         saveButton.click()
@@ -178,7 +190,7 @@ final class KumaNotifyUITests: XCTestCase {
         XCTAssertTrue(primaryMonitor.waitForExistence(timeout: 8))
     }
 
-    func testProductionDashboardCanPresentPaywallFromMoreOptions() {
+    func testProductionDashboardCanPresentPaywallFromIncidentHistoryButton() {
         let app = XCUIApplication()
         let suiteName = "KumaNotifyUITests.productionDashboardPaywall.\(UUID().uuidString)"
         app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
@@ -187,13 +199,9 @@ final class KumaNotifyUITests: XCTestCase {
         app.launchEnvironment["KUMA_UI_TEST_OPEN_RESTORED_DASHBOARD"] = "1"
         app.launch()
 
-        let moreOptionsButton = app.descendants(matching: .any)["dashboard.moreOptionsButton"]
-        XCTAssertTrue(moreOptionsButton.waitForExistence(timeout: 8))
-        moreOptionsButton.click()
-
-        let upgradeMenuItem = app.menuItems["Upgrade to Pro..."]
-        XCTAssertTrue(upgradeMenuItem.waitForExistence(timeout: 8))
-        upgradeMenuItem.click()
+        let incidentHistoryButton = app.buttons["dashboard.incidentHistoryButton"]
+        XCTAssertTrue(incidentHistoryButton.waitForExistence(timeout: 8))
+        incidentHistoryButton.click()
 
         let upgradeButton = app.buttons["paywall.upgradeButton"]
         XCTAssertTrue(upgradeButton.waitForExistence(timeout: 8))

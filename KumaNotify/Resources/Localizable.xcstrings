@@ -328,13 +328,13 @@
         }
       }
     },
-    "Antenna Icon" : {
+    "Kuma Icon" : {
       "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Icono de antena"
+            "value" : "Icono de Kuma"
           }
         }
       }
