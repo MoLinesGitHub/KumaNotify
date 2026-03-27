@@ -54,6 +54,14 @@ struct SparklineView: View {
         let last = dataPoints.last ?? 0
         let min = dataPoints.min() ?? 0
         let max = dataPoints.max() ?? 0
-        return "\(last)ms current, \(min)ms min, \(max)ms max"
+        let currentText = String.localizedStringWithFormat(String(localized: "%@ms"), String(last))
+        let minText = String.localizedStringWithFormat(String(localized: "%@ms"), String(min))
+        let maxText = String.localizedStringWithFormat(String(localized: "%@ms"), String(max))
+        return String.localizedStringWithFormat(
+            String(localized: "%1$@ current, %2$@ min, %3$@ max"),
+            currentText,
+            minText,
+            maxText
+        )
     }
 }

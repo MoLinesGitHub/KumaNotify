@@ -84,6 +84,16 @@
         }
       }
     },
+    "%1$@ current, %2$@ min, %3$@ max" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ actual, %2$@ mín, %3$@ máx"
+          }
+        }
+      }
+    },
     "%lld down" : {
       "comment" : "Widget label showing the count of monitors that are down.",
       "extractionState" : "stale",
@@ -1863,6 +1873,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Disponibilidad"
+          }
+        }
+      }
+    },
+    "Uptime %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponibilidad %@"
+          }
+        }
+      }
+    },
+    "Uptime %@ (%@)" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponibilidad %1$@ (%2$@)"
           }
         }
       }

@@ -15,14 +15,21 @@ struct MonitorRowView: View {
     private static let bubbleSize: CGFloat = 82
     @State private var isHovered = false
 
+    private var pingText: String? {
+        guard let ping = monitor.latestPing else { return nil }
+        return String.localizedStringWithFormat(String(localized: "%@ms"), String(ping))
+    }
+
+    private var uptimeText: String? {
+        guard let uptime = uptimeForPeriod else { return nil }
+        let formatted = uptime.formatted(.percent.precision(.fractionLength(1)))
+        return String.localizedStringWithFormat(String(localized: "Uptime %@"), formatted)
+    }
+
     private var accessibilityDescription: String {
         var parts = [monitor.name, monitor.currentStatus.label]
-        if let ping = monitor.latestPing {
-            parts.append(String(format: String(localized: "%@ms"), "\(ping)"))
-        }
-        if let uptime = uptimeForPeriod {
-            parts.append(String(format: "%.1f%% \(String(localized: "Uptime"))", uptime * 100))
-        }
+        if let pingText { parts.append(pingText) }
+        if let uptimeText { parts.append(uptimeText) }
         if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
             parts.append(String(format: String(localized: "Certificate expires in %lld days"), Int64(days)))
         }
@@ -94,8 +101,8 @@ struct MonitorRowView: View {
                         .minimumScaleFactor(0.65)
                         .padding(.horizontal, 8)
 
-                    if let ping = monitor.latestPing {
-                        Text("\(ping)ms")
+                    if let pingText {
+                        Text(pingText)
                             .font(.system(size: 8, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }

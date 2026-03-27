@@ -977,7 +977,10 @@ final class KumaNotifyTests: XCTestCase {
             "Open System Settings",
             "Retry",
             "%lld up / %lld total",
-            "%@ — %@"
+            "%@ — %@",
+            "%1$@ current, %2$@ min, %3$@ max",
+            "Uptime %@",
+            "Uptime %@ (%@)"
         ].forEach { key in
             XCTAssertTrue(contents.contains("\"\(key)\""), "Missing localization key: \(key)")
         }

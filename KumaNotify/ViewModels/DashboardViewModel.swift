@@ -258,7 +258,9 @@ final class DashboardViewModel {
         for group in groups {
             text += "[\(group.name)]\n"
             for monitor in group.monitors {
-                let ping = monitor.latestPing.map { "\($0)ms" } ?? "-"
+                let ping = monitor.latestPing.map {
+                    String.localizedStringWithFormat(String(localized: "%@ms"), String($0))
+                } ?? "-"
                 text += "  \(monitor.currentStatus.label) \(monitor.name) (\(ping))\n"
             }
             text += "\n"

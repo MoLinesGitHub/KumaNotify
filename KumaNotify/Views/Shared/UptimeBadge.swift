@@ -5,7 +5,7 @@ struct UptimeBadge: View {
     let period: UptimePeriod
 
     private var displayText: String {
-        String(format: "%.1f%%", percentage * 100)
+        percentage.formatted(.percent.precision(.fractionLength(1)))
     }
 
     private var color: Color {
@@ -23,6 +23,12 @@ struct UptimeBadge: View {
             .background(color.opacity(0.15), in: Capsule())
             .foregroundStyle(color)
             .accessibilityLabel(String(localized: "Uptime"))
-            .accessibilityValue("\(displayText) \(period.rawValue)")
+            .accessibilityValue(
+                String.localizedStringWithFormat(
+                    String(localized: "Uptime %@ (%@)"),
+                    displayText,
+                    period.rawValue
+                )
+            )
     }
 }
