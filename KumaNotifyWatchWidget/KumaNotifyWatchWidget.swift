@@ -70,6 +70,8 @@ struct KumaNotifyWatchWidgetEntryView: View {
                 inlineView(data)
             case .accessoryCircular:
                 circularView(data)
+            case .accessoryCorner:
+                cornerView(data)
             default:
                 rectangularView(data)
             }
@@ -79,6 +81,8 @@ struct KumaNotifyWatchWidgetEntryView: View {
                 Text(String(localized: "Open app"))
             case .accessoryCircular:
                 circularNoDataView
+            case .accessoryCorner:
+                cornerNoDataView
             default:
                 rectangularNoDataView
             }
@@ -131,6 +135,37 @@ struct KumaNotifyWatchWidgetEntryView: View {
         }
     }
 
+    private func cornerView(_ data: WidgetData) -> some View {
+        let criticalCount = WidgetDataPresentation.criticalEventCount(for: data)
+        let isCritical = data.overallStatusRaw == "someDown" || data.hasActiveIncident
+
+        return ZStack {
+            AccessoryWidgetBackground()
+            Group {
+                if isCritical {
+                    if criticalCount > 0 {
+                        Text("\(criticalCount)")
+                            .font(.headline.monospacedDigit())
+                    } else {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                    }
+                } else {
+                    Image(systemName: "checkmark")
+                        .font(.caption)
+                }
+            }
+            .foregroundStyle(statusColor(data))
+        }
+        .widgetLabel {
+            Text(
+                isCritical
+                ? WidgetDataPresentation.watchStatusLabel(for: data)
+                : data.monitorSummaryLine
+            )
+        }
+    }
+
     private func rectangularView(_ data: WidgetData) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
@@ -160,6 +195,18 @@ struct KumaNotifyWatchWidgetEntryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private var cornerNoDataView: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .widgetLabel {
+            Text(String(localized: "Open app"))
+        }
     }
 
     private var rectangularNoDataView: some View {
@@ -192,6 +239,6 @@ struct KumaNotifyWatchWidget: Widget {
         }
         .configurationDisplayName(LocalizedStringResource("Kuma Notify"))
         .description(LocalizedStringResource("Monitor your services at a glance."))
-        .supportedFamilies([.accessoryInline, .accessoryCircular, .accessoryRectangular])
+        .supportedFamilies([.accessoryInline, .accessoryCircular, .accessoryCorner, .accessoryRectangular])
     }
 }
