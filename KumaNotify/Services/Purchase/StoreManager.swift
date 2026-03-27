@@ -17,9 +17,11 @@ final class StoreManager {
     private(set) var productLoadErrorMessage: String?
     private(set) var purchaseState: PurchaseState = .idle
 
-    private var transactionListener: Task<Void, Never>?
+    @ObservationIgnored
+    nonisolated(unsafe) private var transactionListener: Task<Void, Never>?
     private let fetchProducts: @Sendable ([String]) async throws -> [Product]
     private let syncAppStore: @Sendable () async throws -> Void
+    private let transactionListenerFactory: @MainActor @Sendable (StoreManager) -> Task<Void, Never>
 
     enum PurchaseState: Equatable {
         case idle
@@ -35,17 +37,42 @@ final class StoreManager {
         syncAppStore: @escaping @Sendable () async throws -> Void = {
             try await AppStore.sync()
         },
+        transactionListenerFactory: @escaping @MainActor @Sendable (StoreManager) -> Task<Void, Never>,
         startListeningForTransactions: Bool = true,
         autoRefresh: Bool = true
     ) {
         self.fetchProducts = fetchProducts
         self.syncAppStore = syncAppStore
+        self.transactionListenerFactory = transactionListenerFactory
         if startListeningForTransactions {
-            transactionListener = listenForTransactions()
+            transactionListener = transactionListenerFactory(self)
         }
         if autoRefresh {
             Task { await refreshStatus() }
         }
+    }
+
+    convenience init(
+        fetchProducts: @escaping @Sendable ([String]) async throws -> [Product] = { ids in
+            try await Product.products(for: ids)
+        },
+        syncAppStore: @escaping @Sendable () async throws -> Void = {
+            try await AppStore.sync()
+        },
+        startListeningForTransactions: Bool = true,
+        autoRefresh: Bool = true
+    ) {
+        self.init(
+            fetchProducts: fetchProducts,
+            syncAppStore: syncAppStore,
+            transactionListenerFactory: { manager in StoreManager.makeDefaultTransactionListener(for: manager) },
+            startListeningForTransactions: startListeningForTransactions,
+            autoRefresh: autoRefresh
+        )
+    }
+
+    deinit {
+        transactionListener?.cancel()
     }
 
     // MARK: - Public
@@ -141,17 +168,18 @@ final class StoreManager {
         purchaseState = .idle
     }
 
-    private func listenForTransactions() -> Task<Void, Never> {
-        Task { @MainActor [weak self] in
+    private static func makeDefaultTransactionListener(for manager: StoreManager) -> Task<Void, Never> {
+        Task { @MainActor [weak manager] in
             for await result in Transaction.updates {
+                guard let manager else { return }
                 switch result {
                 case .verified(let transaction):
                     await transaction.finish()
                     if transaction.productID == AppConstants.proProductId {
                         if transaction.revocationDate != nil {
-                            self?.applyEntitlementState(isEntitled: false)
+                            manager.applyEntitlementState(isEntitled: false)
                         } else {
-                            self?.applyEntitlementState(isEntitled: true)
+                            manager.applyEntitlementState(isEntitled: true)
                         }
                     }
                 case .unverified(let transaction, let error):

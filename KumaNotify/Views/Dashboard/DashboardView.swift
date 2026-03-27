@@ -40,6 +40,22 @@ struct DashboardView: View {
 
     @State private var showPaywall = false
 
+    init(
+        menuBarVM: MenuBarViewModel,
+        dashboardVM: DashboardViewModel,
+        storeManager: StoreManager,
+        settingsStore: SettingsStore,
+        persistence: PersistenceManager?,
+        initialShowPaywall: Bool = false
+    ) {
+        self.menuBarVM = menuBarVM
+        self.dashboardVM = dashboardVM
+        self.storeManager = storeManager
+        self.settingsStore = settingsStore
+        self.persistence = persistence
+        _showPaywall = State(initialValue: initialShowPaywall)
+    }
+
     private var isPro: Bool {
         #if DEBUG
         storeManager.effectiveProUnlocked
@@ -314,10 +330,10 @@ struct DashboardView: View {
                 Image(systemName: "ellipsis.circle")
                     .font(.body)
                     .frame(width: 28, height: 28)
+                    .accessibilityIdentifier("dashboard.moreOptionsButton")
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .accessibilityIdentifier("dashboard.moreOptionsButton")
             .accessibilityLabel(String(localized: "More Options"))
         }
         .padding(.horizontal, 12)

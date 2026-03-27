@@ -127,7 +127,10 @@ final class MenuBarViewModel {
 
     private func fetchAllServers() async {
         let connections = settingsStore.serverConnections
-        settingsStore.notificationAuthorizationStatus = await notificationAuthorizationStatusProvider()
+        let notificationAuthorizationStatus = await notificationAuthorizationStatusProvider()
+        if settingsStore.notificationAuthorizationStatus != notificationAuthorizationStatus {
+            settingsStore.notificationAuthorizationStatus = notificationAuthorizationStatus
+        }
 
         guard networkMonitor.isConnected else {
             let offlineMessage = String(localized: "No network connection")

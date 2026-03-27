@@ -805,6 +805,16 @@
         }
       }
     },
+    "Are my servers up in %@?" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Están activos mis servidores en %@?"
+          }
+        }
+      }
+    },
     "http://192.168.1.100:3001" : {
       "comment" : "A placeholder for the server URL field in the onboarding flow.",
       "localizations" : {

@@ -1,6 +1,15 @@
 import Foundation
 
 struct UptimeKumaMapper: Sendable {
+    private static let timestampFormatterLock = NSLock()
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
+
     func mapStatusPage(
         _ response: UKStatusPageResponse,
         heartbeatResult: HeartbeatResult?
@@ -83,10 +92,8 @@ struct UptimeKumaMapper: Sendable {
     }
 
     private func parseTimestamp(_ value: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter.date(from: value)
+        Self.timestampFormatterLock.lock()
+        defer { Self.timestampFormatterLock.unlock() }
+        return Self.timestampFormatter.date(from: value)
     }
 }

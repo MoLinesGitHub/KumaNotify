@@ -80,7 +80,7 @@ actor PersistenceManager {
         }
     }
 
-    func purgeOldIncidents(olderThan days: Int = 30) {
+    func purgeOldIncidents(olderThan days: Int = AppConstants.incidentRetentionDays) {
         guard let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) else {
             print("Persistence: Failed to calculate purge cutoff date")
             return

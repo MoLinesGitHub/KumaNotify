@@ -9,6 +9,12 @@ enum SettingsViewLogic {
         case showSystemSettingsHelp
     }
 
+    enum TestNotificationDecision: Equatable {
+        case requestSystemPermission
+        case showSystemSettingsHelp
+        case sendTest
+    }
+
     static func canAddServer(isPro: Bool, serverCount: Int) -> Bool {
         isPro || serverCount < 1
     }
@@ -37,6 +43,19 @@ enum SettingsViewLogic {
         authorizationStatus: NotificationAuthorizationStatus
     ) -> Bool {
         authorizationStatus == .denied
+    }
+
+    static func testNotificationDecision(
+        authorizationStatus: NotificationAuthorizationStatus
+    ) -> TestNotificationDecision {
+        switch authorizationStatus {
+        case .authorized:
+            return .sendTest
+        case .notDetermined:
+            return .requestSystemPermission
+        case .denied:
+            return .showSystemSettingsHelp
+        }
     }
 }
 
@@ -328,17 +347,20 @@ struct SettingsView: View {
                     Button("Test Notification") {
                         Task { @MainActor in
                             var status = settingsStore.notificationAuthorizationStatus
-                            if status == .notDetermined {
+                            if SettingsViewLogic.testNotificationDecision(
+                                authorizationStatus: status
+                            ) == .requestSystemPermission {
                                 status = await NotificationManager.shared.requestPermission()
                                 settingsStore.notificationAuthorizationStatus = status
                             }
 
-                            guard status == .authorized else {
+                            guard SettingsViewLogic.testNotificationDecision(
+                                authorizationStatus: status
+                            ) == .sendTest else {
                                 showNotificationSettingsHelp = (status == .denied)
                                 return
                             }
 
-                            settingsStore.notificationsEnabled = true
                             await NotificationManager.shared.sendTestNotification(
                                 soundOption: settingsStore.notificationSound
                             )

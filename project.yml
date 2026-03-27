@@ -79,6 +79,7 @@ targets:
     sources:
       - path: KumaNotifyWidget
       - path: KumaNotifyShared
+      - path: KumaNotify/Resources/Localizable.xcstrings
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.widget

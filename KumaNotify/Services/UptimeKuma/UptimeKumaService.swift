@@ -21,7 +21,7 @@ final class UptimeKumaService: MonitoringServiceProtocol, Sendable {
     }
 
     func validateConnection(_ connection: ServerConnection) async throws -> Bool {
-        let _: UKStatusPageResponse = try await httpClient.get(url: connection.statusPageURL)
+        _ = try await fetchStatusPage(connection: connection)
         return true
     }
 }

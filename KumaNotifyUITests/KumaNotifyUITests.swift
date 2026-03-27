@@ -2,6 +2,12 @@ import XCTest
 
 @MainActor
 final class KumaNotifyUITests: XCTestCase {
+    private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "exists == true AND enabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -36,6 +42,25 @@ final class KumaNotifyUITests: XCTestCase {
         let nextButton = app.descendants(matching: .any)["onboarding.nextButton"]
         XCTAssertTrue(nextButton.exists)
         XCTAssertFalse(nextButton.isEnabled)
+    }
+
+    func testProductionFirstLaunchCanAdvanceToServerSetup() {
+        let app = XCUIApplication()
+        let suiteName = "KumaNotifyUITests.productionOnboarding.\(UUID().uuidString)"
+        app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
+        app.launch()
+
+        let welcomeTitle = app.staticTexts["onboarding.welcomeTitle"]
+        XCTAssertTrue(welcomeTitle.waitForExistence(timeout: 8))
+
+        let getStartedButton = app.buttons["onboarding.getStartedButton"]
+        XCTAssertTrue(getStartedButton.waitForExistence(timeout: 5))
+        getStartedButton.click()
+
+        let serverURLField = app.descendants(matching: .any)["onboarding.serverURLField"]
+        let slugField = app.descendants(matching: .any)["onboarding.statusPageSlugField"]
+        XCTAssertTrue(serverURLField.waitForExistence(timeout: 8))
+        XCTAssertTrue(slugField.exists)
     }
 
     func testSettingsWindowShowsServerManagementControls() {
@@ -74,7 +99,7 @@ final class KumaNotifyUITests: XCTestCase {
         slugField.click()
         slugField.typeText("production")
 
-        XCTAssertTrue(saveButton.isEnabled)
+        XCTAssertTrue(waitForEnabled(saveButton, timeout: 5))
         saveButton.click()
 
         XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
@@ -119,7 +144,7 @@ final class KumaNotifyUITests: XCTestCase {
         displayNameField.click()
         displayNameField.typeText("Secondary")
 
-        XCTAssertTrue(saveButton.isEnabled)
+        XCTAssertTrue(waitForEnabled(saveButton, timeout: 5))
         saveButton.click()
 
         XCTAssertTrue(app.staticTexts["Secondary"].waitForExistence(timeout: 8))
@@ -138,6 +163,40 @@ final class KumaNotifyUITests: XCTestCase {
         let restoreButton = app.descendants(matching: .any)["paywall.restoreButton"]
         XCTAssertTrue(upgradeButton.waitForExistence(timeout: 8))
         XCTAssertTrue(restoreButton.exists)
+    }
+
+    func testProductionDashboardWindowShowsMonitorRowsThroughRestoredFlow() {
+        let app = XCUIApplication()
+        let suiteName = "KumaNotifyUITests.productionDashboard.\(UUID().uuidString)"
+        app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
+        app.launchEnvironment["KUMA_UI_TEST_SEED_SERVER"] = "1"
+        app.launchEnvironment["KUMA_UI_TEST_USE_STUB_MONITORING"] = "1"
+        app.launchEnvironment["KUMA_UI_TEST_OPEN_RESTORED_DASHBOARD"] = "1"
+        app.launch()
+
+        let primaryMonitor = app.buttons["dashboard.monitor.primary-api"]
+        XCTAssertTrue(primaryMonitor.waitForExistence(timeout: 8))
+    }
+
+    func testProductionDashboardCanPresentPaywallFromMoreOptions() {
+        let app = XCUIApplication()
+        let suiteName = "KumaNotifyUITests.productionDashboardPaywall.\(UUID().uuidString)"
+        app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
+        app.launchEnvironment["KUMA_UI_TEST_SEED_SERVER"] = "1"
+        app.launchEnvironment["KUMA_UI_TEST_USE_STUB_MONITORING"] = "1"
+        app.launchEnvironment["KUMA_UI_TEST_OPEN_RESTORED_DASHBOARD"] = "1"
+        app.launch()
+
+        let moreOptionsButton = app.descendants(matching: .any)["dashboard.moreOptionsButton"]
+        XCTAssertTrue(moreOptionsButton.waitForExistence(timeout: 8))
+        moreOptionsButton.click()
+
+        let upgradeMenuItem = app.menuItems["Upgrade to Pro..."]
+        XCTAssertTrue(upgradeMenuItem.waitForExistence(timeout: 8))
+        upgradeMenuItem.click()
+
+        let upgradeButton = app.buttons["paywall.upgradeButton"]
+        XCTAssertTrue(upgradeButton.waitForExistence(timeout: 8))
     }
 
     func testDashboardWindowCanSwitchBetweenServers() {

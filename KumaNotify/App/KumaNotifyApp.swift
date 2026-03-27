@@ -24,8 +24,11 @@ struct KumaNotifyApp: App {
     private let uiTestShowsSettings: Bool
     private let uiTestShowsPaywall: Bool
     private let uiTestShowsDashboard: Bool
+    private let uiTestOpensRestoredDashboard: Bool
+    private let uiTestShowsPaywallFromRestoredDashboard: Bool
     private let uiTestSeedsServerConnection: Bool
     private let uiTestForcesPro: Bool
+    private let uiTestUsesStubMonitoring: Bool
     @State private var settingsStore: SettingsStore
     @State private var pollingEngine: PollingEngine
     @State private var persistence: PersistenceManager?
@@ -113,8 +116,11 @@ struct KumaNotifyApp: App {
         self.uiTestShowsSettings = environment["KUMA_UI_TEST_SHOW_SETTINGS"] == "1"
         self.uiTestShowsPaywall = environment["KUMA_UI_TEST_SHOW_PAYWALL"] == "1"
         self.uiTestShowsDashboard = environment["KUMA_UI_TEST_SHOW_DASHBOARD"] == "1"
+        self.uiTestOpensRestoredDashboard = environment["KUMA_UI_TEST_OPEN_RESTORED_DASHBOARD"] == "1"
+        self.uiTestShowsPaywallFromRestoredDashboard = environment["KUMA_UI_TEST_SHOW_PAYWALL_FROM_DASHBOARD"] == "1"
         self.uiTestSeedsServerConnection = environment["KUMA_UI_TEST_SEED_SERVER"] == "1"
         self.uiTestForcesPro = environment["KUMA_UI_TEST_FORCE_PRO"] == "1"
+        self.uiTestUsesStubMonitoring = environment["KUMA_UI_TEST_USE_STUB_MONITORING"] == "1"
 
         let store = SettingsStore(suiteName: settingsSuiteName)
         let engine = PollingEngine()
@@ -155,20 +161,41 @@ struct KumaNotifyApp: App {
         ) {
         case .restoreMonitoring:
             let connection = store.serverConnection!
+            let monitoringServiceFactory: (MonitoringProvider) -> any MonitoringServiceProtocol
+            if uiTestUsesStubMonitoring {
+                let service = UITestDashboardMonitoringService()
+                monitoringServiceFactory = { _ in service }
+            } else {
+                monitoringServiceFactory = MonitoringServiceFactory.create
+            }
             let menuBarVM = MenuBarViewModel(
                 settingsStore: store,
                 pollingEngine: engine,
+                serviceFactory: monitoringServiceFactory,
                 persistence: _persistence.wrappedValue,
                 storeManager: sm
             )
             let dashboardVM = DashboardViewModel(
                 connection: connection,
                 settingsStore: store,
-                persistence: _persistence.wrappedValue
+                persistence: _persistence.wrappedValue,
+                serviceFactory: monitoringServiceFactory
             )
             _menuBarVM = State(initialValue: menuBarVM)
             _dashboardVM = State(initialValue: dashboardVM)
             bootstrapMonitoring(menuBarVM)
+            if uiTestOpensRestoredDashboard {
+                let shouldShowPaywall = uiTestShowsPaywallFromRestoredDashboard
+                Task { @MainActor in
+                    UITestDashboardWindow.show(
+                        menuBarVM: menuBarVM,
+                        dashboardVM: dashboardVM,
+                        storeManager: sm,
+                        settingsStore: store,
+                        initialShowPaywall: shouldShowPaywall
+                    )
+                }
+            }
         case .emptyState(let shouldShowOnboarding):
             Self.clearSharedWidgetData()
             _showOnboarding = State(initialValue: shouldShowOnboarding)
@@ -390,7 +417,8 @@ private enum UITestDashboardWindow {
         menuBarVM: MenuBarViewModel,
         dashboardVM: DashboardViewModel,
         storeManager: StoreManager,
-        settingsStore: SettingsStore
+        settingsStore: SettingsStore,
+        initialShowPaywall: Bool = false
     ) {
         let hostingView = NSHostingView(
             rootView: DashboardView(
@@ -398,7 +426,8 @@ private enum UITestDashboardWindow {
                 dashboardVM: dashboardVM,
                 storeManager: storeManager,
                 settingsStore: settingsStore,
-                persistence: nil
+                persistence: nil,
+                initialShowPaywall: initialShowPaywall
             )
             .frame(width: 380, height: 520)
         )

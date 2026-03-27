@@ -23,6 +23,14 @@ final class KumaNotifyTests: XCTestCase {
         return try String(contentsOf: catalogURL, encoding: .utf8)
     }
 
+    private func projectYAMLContents() throws -> String {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let projectURL = repoRoot.appendingPathComponent("project.yml")
+        return try String(contentsOf: projectURL, encoding: .utf8)
+    }
+
     actor CountingMonitoringService: MonitoringServiceProtocol {
         private(set) var statusPageCallCount = 0
         private(set) var heartbeatCallCount = 0
@@ -469,6 +477,42 @@ final class KumaNotifyTests: XCTestCase {
         let incidents = await manager.fetchRecentIncidents(limit: 10)
         XCTAssertEqual(incidents.count, 1)
         XCTAssertEqual(incidents.first?.monitorId, "recent")
+    }
+
+    @MainActor
+    func testPersistenceManagerDefaultPurgeUsesAppRetentionWindow() async throws {
+        let manager = try PersistenceManager(isStoredInMemoryOnly: true)
+
+        await manager.recordIncident(IncidentRecordSnapshot(
+            monitorId: "expired",
+            monitorName: "Expired Monitor",
+            serverConnectionId: UUID(),
+            serverName: "Prod",
+            transitionType: .wentDown,
+            timestamp: Calendar.current.date(
+                byAdding: .day,
+                value: -(AppConstants.incidentRetentionDays + 1),
+                to: Date()
+            )!
+        ))
+        await manager.recordIncident(IncidentRecordSnapshot(
+            monitorId: "retained",
+            monitorName: "Retained Monitor",
+            serverConnectionId: UUID(),
+            serverName: "Prod",
+            transitionType: .wentDown,
+            timestamp: Calendar.current.date(
+                byAdding: .day,
+                value: -(AppConstants.incidentRetentionDays - 1),
+                to: Date()
+            )!
+        ))
+
+        await manager.purgeOldIncidents()
+
+        let incidents = await manager.fetchRecentIncidents(limit: 10)
+        XCTAssertEqual(incidents.count, 1)
+        XCTAssertEqual(incidents.first?.monitorId, "retained")
     }
 
     @MainActor
@@ -1012,6 +1056,37 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(storeManager.purchaseState, .idle)
         XCTAssertNil(storeManager.productLoadErrorMessage)
         XCTAssertFalse(storeManager.proUnlocked)
+    }
+
+    @MainActor
+    func testStoreManagerDeinitCancelsTransactionListener() async {
+        let cancellationExpectation = expectation(description: "transaction listener cancelled")
+        var externalTask: Task<Void, Never>?
+        weak var weakManager: StoreManager?
+
+        autoreleasepool {
+            let storeManager = StoreManager(
+                fetchProducts: { _ in [] },
+                syncAppStore: {},
+                transactionListenerFactory: { _ in
+                    let task = Task<Void, Never> {
+                        defer { cancellationExpectation.fulfill() }
+                        while !Task.isCancelled {
+                            try? await Task.sleep(for: .milliseconds(10))
+                        }
+                    }
+                    externalTask = task
+                    return task
+                },
+                startListeningForTransactions: true,
+                autoRefresh: false
+            )
+            weakManager = storeManager
+        }
+
+        XCTAssertNil(weakManager)
+        await fulfillment(of: [cancellationExpectation], timeout: 1)
+        XCTAssertTrue(externalTask?.isCancelled ?? false)
     }
 
     func testIntentStatusFormatterBuildsLocalizedSummaries() {
@@ -2025,7 +2100,7 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(result.heartbeats["1"]?.count, 1)
     }
 
-    func testUptimeKumaServiceValidateConnectionOnlyHitsStatusPageEndpoint() async throws {
+    func testUptimeKumaServiceValidateConnectionUsesSameEndpointsAsLiveStatusFetch() async throws {
         let connection = ServerConnection(
             name: "Primary",
             baseURL: URL(string: "https://status.example.com")!,
@@ -2059,7 +2134,7 @@ final class KumaNotifyTests: XCTestCase {
         let requestedURLs = await httpClient.requestedURLSnapshot()
 
         XCTAssertTrue(isValid)
-        XCTAssertEqual(requestedURLs, [connection.statusPageURL])
+        XCTAssertEqual(requestedURLs, [connection.heartbeatURL, connection.statusPageURL])
     }
 
     func testUptimeKumaServiceFetchHeartbeatsOnlyHitsHeartbeatEndpoint() async throws {
@@ -2283,6 +2358,12 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertFalse(WidgetDataPresentation.shouldShowSummary(for: offline))
     }
 
+    func testProjectYAMLBundlesLocalizableCatalogIntoWidgetTarget() throws {
+        let project = try projectYAMLContents()
+        XCTAssertTrue(project.contains("KumaNotifyWidget:"))
+        XCTAssertTrue(project.contains("- path: KumaNotify/Resources/Localizable.xcstrings"))
+    }
+
     func testSettingsViewLogicGatesMultipleServersForFreeTier() {
         XCTAssertTrue(SettingsViewLogic.canAddServer(isPro: false, serverCount: 0))
         XCTAssertFalse(SettingsViewLogic.canAddServer(isPro: false, serverCount: 1))
@@ -2325,6 +2406,19 @@ final class KumaNotifyTests: XCTestCase {
 
         XCTAssertTrue(SettingsViewLogic.shouldShowDeniedNotificationBanner(authorizationStatus: .denied))
         XCTAssertFalse(SettingsViewLogic.shouldShowDeniedNotificationBanner(authorizationStatus: .authorized))
+
+        XCTAssertEqual(
+            SettingsViewLogic.testNotificationDecision(authorizationStatus: .authorized),
+            .sendTest
+        )
+        XCTAssertEqual(
+            SettingsViewLogic.testNotificationDecision(authorizationStatus: .notDetermined),
+            .requestSystemPermission
+        )
+        XCTAssertEqual(
+            SettingsViewLogic.testNotificationDecision(authorizationStatus: .denied),
+            .showSystemSettingsHelp
+        )
     }
 
     func testOnboardingViewLogicBuildsNormalizedDraftConnection() {
