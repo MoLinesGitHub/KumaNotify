@@ -2,13 +2,13 @@ import Foundation
 import AppKit
 import UserNotifications
 
-public enum NotificationAuthorizationStatus: String, Sendable {
+enum NotificationAuthorizationStatus: String, Sendable {
     case notDetermined
     case denied
     case authorized
 }
 
-public protocol NotificationManaging: Sendable {
+protocol NotificationManaging: Sendable {
     func sendDownAlert(
         serverConnectionId: UUID,
         monitorId: String,
@@ -34,15 +34,15 @@ public protocol NotificationManaging: Sendable {
     func sendTestNotification(soundOption: NotificationSoundOption) async
 }
 
-public actor NotificationManager: NotificationManaging {
-    public static let shared = NotificationManager()
+actor NotificationManager: NotificationManaging {
+    static let shared = NotificationManager()
 
     private let requestAuthorizationHandler: @Sendable () async throws -> Bool
     private let authorizationStatusHandler: @Sendable () async -> UNAuthorizationStatus
     private let openURLHandler: @Sendable (URL) -> Bool
     private let scheduleRequestHandler: @Sendable (UNNotificationRequest) -> Void
 
-    public init(
+    init(
         requestAuthorizationHandler: @escaping @Sendable () async throws -> Bool = {
             try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound, .badge])
@@ -58,9 +58,10 @@ public actor NotificationManager: NotificationManaging {
             return true
         },
         scheduleRequestHandler: @escaping @Sendable (UNNotificationRequest) -> Void = { request in
+            let requestIdentifier = request.identifier
             UNUserNotificationCenter.current().add(request) { error in
                 if let error {
-                    print("Notifications: Failed to deliver notification '\(request.identifier)': \(error.localizedDescription)")
+                    print("Notifications: Failed to deliver notification '\(requestIdentifier)': \(error.localizedDescription)")
                 }
             }
         }
@@ -71,19 +72,19 @@ public actor NotificationManager: NotificationManaging {
         self.scheduleRequestHandler = scheduleRequestHandler
     }
 
-    public static func downAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
+    static func downAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
         "down_\(serverConnectionId.uuidString)_\(monitorId)"
     }
 
-    public static func recoveryAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
+    static func recoveryAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
         "recovery_\(serverConnectionId.uuidString)_\(monitorId)"
     }
 
-    public static func certExpiryIdentifier(serverConnectionId: UUID, monitorId: String, daysRemaining: Int) -> String {
+    static func certExpiryIdentifier(serverConnectionId: UUID, monitorId: String, daysRemaining: Int) -> String {
         "cert_\(serverConnectionId.uuidString)_\(monitorId)_\(daysRemaining)"
     }
 
-    public func requestPermission() async -> NotificationAuthorizationStatus {
+    func requestPermission() async -> NotificationAuthorizationStatus {
         do {
             _ = try await requestAuthorizationHandler()
             return await notificationAuthorizationStatus()
@@ -93,7 +94,7 @@ public actor NotificationManager: NotificationManaging {
         }
     }
 
-    public func notificationAuthorizationStatus() async -> NotificationAuthorizationStatus {
+    func notificationAuthorizationStatus() async -> NotificationAuthorizationStatus {
         switch await authorizationStatusHandler() {
         case .authorized, .provisional, .ephemeral:
             return .authorized
@@ -104,21 +105,23 @@ public actor NotificationManager: NotificationManaging {
         }
     }
 
-    public func notificationsAuthorized() async -> Bool {
+    func notificationsAuthorized() async -> Bool {
         await notificationAuthorizationStatus() == .authorized
     }
 
     @discardableResult
-    public func openSystemNotificationSettings() -> Bool {
+    func openSystemNotificationSettings() -> Bool {
         if let deepLink = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
-            return openURLHandler(deepLink)
+            if openURLHandler(deepLink) {
+                return true
+            }
         }
 
         let systemSettingsURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
         return openURLHandler(systemSettingsURL)
     }
 
-    public func sendDownAlert(
+    func sendDownAlert(
         serverConnectionId: UUID,
         monitorId: String,
         monitorName: String,
@@ -139,7 +142,7 @@ public actor NotificationManager: NotificationManaging {
         )
     }
 
-    public func sendRecoveryAlert(
+    func sendRecoveryAlert(
         serverConnectionId: UUID,
         monitorId: String,
         monitorName: String,
@@ -167,7 +170,7 @@ public actor NotificationManager: NotificationManaging {
         )
     }
 
-    public func sendCertExpiryWarning(
+    func sendCertExpiryWarning(
         serverConnectionId: UUID,
         monitorId: String,
         monitorName: String,
@@ -191,7 +194,7 @@ public actor NotificationManager: NotificationManaging {
         )
     }
 
-    public func sendTestNotification(soundOption: NotificationSoundOption = .system) async {
+    func sendTestNotification(soundOption: NotificationSoundOption = .system) async {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Kuma Notify")
         content.body = String(localized: "Test notification — sound is working!")

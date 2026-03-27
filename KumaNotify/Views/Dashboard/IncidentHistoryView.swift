@@ -33,8 +33,10 @@ struct IncidentHistoryView: View {
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(String(localized: "Back"))
+                .accessibilityIdentifier("dashboard.incidentHistoryBackButton")
                 Text("Incident History")
                     .font(.headline)
+                    .accessibilityIdentifier("dashboard.incidentHistoryTitle")
                 Spacer()
             }
             .padding(12)
@@ -83,6 +85,7 @@ struct IncidentHistoryView: View {
             Text("No incidents recorded")
                 .font(.headline)
                 .foregroundStyle(.secondary)
+                .accessibilityIdentifier("dashboard.incidentHistoryEmptyState")
             Text("Incidents will appear here when monitors go down or recover.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)

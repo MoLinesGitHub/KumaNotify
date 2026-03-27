@@ -2,9 +2,9 @@ import Foundation
 import SwiftData
 
 @ModelActor
-public actor PersistenceManager {
+actor PersistenceManager {
     
-    public init(isStoredInMemoryOnly: Bool = false) throws {
+    init(isStoredInMemoryOnly: Bool = false) throws {
         let schema = Schema([IncidentRecord.self, MonitorPreference.self])
         let config = ModelConfiguration(
             "KumaNotify",
@@ -17,7 +17,7 @@ public actor PersistenceManager {
 
     // MARK: - Incident Records
 
-    public func recordIncident(_ record: IncidentRecord) {
+    func recordIncident(_ record: IncidentRecord) {
         // Deduplication: skip if same monitor+transition within 60s
         let windowStart = record.timestamp.addingTimeInterval(-60)
 
@@ -52,7 +52,7 @@ public actor PersistenceManager {
         }
     }
 
-    public func fetchRecentIncidents(
+    func fetchRecentIncidents(
         serverConnectionId: UUID? = nil,
         limit: Int = 100
     ) -> [IncidentRecord] {
@@ -79,7 +79,7 @@ public actor PersistenceManager {
         }
     }
 
-    public func purgeOldIncidents(olderThan days: Int = 30) {
+    func purgeOldIncidents(olderThan days: Int = 30) {
         guard let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) else {
             print("Persistence: Failed to calculate purge cutoff date")
             return
@@ -95,7 +95,7 @@ public actor PersistenceManager {
 
     // MARK: - Monitor Preferences
 
-    public func fetchAllPreferences() -> [String: MonitorPreference] {
+    func fetchAllPreferences() -> [String: MonitorPreference] {
         let descriptor = FetchDescriptor<MonitorPreference>()
         do {
             let results = try modelContext.fetch(descriptor)
@@ -106,7 +106,7 @@ public actor PersistenceManager {
         }
     }
 
-    public func togglePin(for monitorId: String, serverConnectionId: UUID) {
+    func togglePin(for monitorId: String, serverConnectionId: UUID) {
         let pref = fetchOrCreatePreference(for: monitorId, serverConnectionId: serverConnectionId)
         pref.pin()
         do {
@@ -116,7 +116,7 @@ public actor PersistenceManager {
         }
     }
 
-    public func toggleHidden(for monitorId: String, serverConnectionId: UUID) {
+    func toggleHidden(for monitorId: String, serverConnectionId: UUID) {
         let pref = fetchOrCreatePreference(for: monitorId, serverConnectionId: serverConnectionId)
         pref.hide()
         do {

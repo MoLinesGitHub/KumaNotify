@@ -99,7 +99,9 @@ struct SettingsView: View {
         }
         .alert(String(localized: "Notifications Disabled in System Settings"), isPresented: $showNotificationSettingsHelp) {
             Button(String(localized: "Open System Settings")) {
-                NotificationManager.shared.openSystemNotificationSettings()
+                Task {
+                    _ = await NotificationManager.shared.openSystemNotificationSettings()
+                }
             }
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: {
@@ -302,7 +304,9 @@ struct SettingsView: View {
                             Text("Notifications are currently blocked by System Settings.")
                                 .font(.caption)
                             Button("Open System Settings") {
-                                NotificationManager.shared.openSystemNotificationSettings()
+                                Task {
+                                    _ = await NotificationManager.shared.openSystemNotificationSettings()
+                                }
                             }
                             .buttonStyle(.link)
                             .font(.caption)

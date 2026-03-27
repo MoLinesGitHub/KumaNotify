@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class IncidentRecord {
+final class IncidentRecord: @unchecked Sendable {
     var monitorId: String
     var monitorName: String
     var serverConnectionId: UUID

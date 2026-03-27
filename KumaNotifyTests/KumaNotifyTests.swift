@@ -109,6 +109,7 @@ final class KumaNotifyTests: XCTestCase {
         private(set) var downAlerts: [(UUID, String)] = []
         private(set) var recoveryAlerts: [(UUID, String)] = []
         private(set) var certExpiryWarnings: [(UUID, String, Int)] = []
+        private(set) var testNotificationCount = 0
 
         func sendDownAlert(
             serverConnectionId: UUID,
@@ -116,7 +117,7 @@ final class KumaNotifyTests: XCTestCase {
             monitorName: String,
             serverName: String,
             soundOption: NotificationSoundOption
-        ) {
+        ) async {
             downAlerts.append((serverConnectionId, monitorId))
         }
 
@@ -127,7 +128,7 @@ final class KumaNotifyTests: XCTestCase {
             serverName: String,
             downDuration: TimeInterval?,
             soundOption: NotificationSoundOption
-        ) {
+        ) async {
             recoveryAlerts.append((serverConnectionId, monitorId))
         }
 
@@ -137,8 +138,12 @@ final class KumaNotifyTests: XCTestCase {
             monitorName: String,
             daysRemaining: Int,
             soundOption: NotificationSoundOption
-        ) {
+        ) async {
             certExpiryWarnings.append((serverConnectionId, monitorId, daysRemaining))
+        }
+
+        func sendTestNotification(soundOption: NotificationSoundOption) async {
+            testNotificationCount += 1
         }
     }
 
@@ -411,12 +416,12 @@ final class KumaNotifyTests: XCTestCase {
     }
 
     @MainActor
-    func testPersistenceManagerDeduplicatesRepeatedIncidentsWithinWindow() throws {
+    func testPersistenceManagerDeduplicatesRepeatedIncidentsWithinWindow() async throws {
         let manager = try PersistenceManager(isStoredInMemoryOnly: true)
         let timestamp = Date()
         let serverConnectionId = UUID()
 
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "api",
             monitorName: "API",
             serverConnectionId: serverConnectionId,
@@ -424,7 +429,7 @@ final class KumaNotifyTests: XCTestCase {
             transitionType: .wentDown,
             timestamp: timestamp
         ))
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "api",
             monitorName: "API",
             serverConnectionId: serverConnectionId,
@@ -433,14 +438,15 @@ final class KumaNotifyTests: XCTestCase {
             timestamp: timestamp.addingTimeInterval(30)
         ))
 
-        XCTAssertEqual(manager.fetchRecentIncidents(limit: 10).count, 1)
+        let incidents = await manager.fetchRecentIncidents(limit: 10)
+        XCTAssertEqual(incidents.count, 1)
     }
 
     @MainActor
-    func testPersistenceManagerPurgesOnlyExpiredIncidents() throws {
+    func testPersistenceManagerPurgesOnlyExpiredIncidents() async throws {
         let manager = try PersistenceManager(isStoredInMemoryOnly: true)
 
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "old",
             monitorName: "Old Monitor",
             serverConnectionId: UUID(),
@@ -448,7 +454,7 @@ final class KumaNotifyTests: XCTestCase {
             transitionType: .wentDown,
             timestamp: Calendar.current.date(byAdding: .day, value: -91, to: Date())!
         ))
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "recent",
             monitorName: "Recent Monitor",
             serverConnectionId: UUID(),
@@ -458,9 +464,9 @@ final class KumaNotifyTests: XCTestCase {
             downDuration: 42
         ))
 
-        manager.purgeOldIncidents(olderThan: 90)
+        await manager.purgeOldIncidents(olderThan: 90)
 
-        let incidents = manager.fetchRecentIncidents(limit: 10)
+        let incidents = await manager.fetchRecentIncidents(limit: 10)
         XCTAssertEqual(incidents.count, 1)
         XCTAssertEqual(incidents.first?.monitorId, "recent")
     }
@@ -783,7 +789,7 @@ final class KumaNotifyTests: XCTestCase {
         await viewModel.refresh()
         await viewModel.refresh()
 
-        let incidents = persistence.fetchRecentIncidents(serverConnectionId: connection.id, limit: 10)
+        let incidents = await persistence.fetchRecentIncidents(serverConnectionId: connection.id, limit: 10)
         XCTAssertEqual(incidents.count, 2)
         XCTAssertEqual(incidents.map(\.transitionType), [.recovered, .wentDown])
         XCTAssertFalse(store.isMonitorAcknowledged(connectionId: connection.id, monitorId: "api"))
@@ -939,7 +945,7 @@ final class KumaNotifyTests: XCTestCase {
         await viewModel.refresh()
         await viewModel.refresh()
 
-        let incidents = persistence.fetchRecentIncidents(serverConnectionId: connection.id, limit: 10)
+        let incidents = await persistence.fetchRecentIncidents(serverConnectionId: connection.id, limit: 10)
         XCTAssertEqual(incidents.count, 1)
         XCTAssertEqual(incidents.first?.transitionType, .wentDown)
     }
@@ -1078,19 +1084,19 @@ final class KumaNotifyTests: XCTestCase {
     }
 
     @MainActor
-    func testPersistenceManagerFetchRecentIncidentsCanScopeToConnection() throws {
+    func testPersistenceManagerFetchRecentIncidentsCanScopeToConnection() async throws {
         let manager = try PersistenceManager(isStoredInMemoryOnly: true)
         let primaryID = UUID()
         let secondaryID = UUID()
 
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "primary-api",
             monitorName: "Primary API",
             serverConnectionId: primaryID,
             serverName: "Primary",
             transitionType: .wentDown
         ))
-        manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecord(
             monitorId: "secondary-api",
             monitorName: "Secondary API",
             serverConnectionId: secondaryID,
@@ -1098,14 +1104,14 @@ final class KumaNotifyTests: XCTestCase {
             transitionType: .wentDown
         ))
 
-        let primaryIncidents = manager.fetchRecentIncidents(serverConnectionId: primaryID, limit: 10)
+        let primaryIncidents = await manager.fetchRecentIncidents(serverConnectionId: primaryID, limit: 10)
 
         XCTAssertEqual(primaryIncidents.count, 1)
         XCTAssertEqual(primaryIncidents.first?.serverConnectionId, primaryID)
     }
 
     @MainActor
-    func testDashboardViewModelScopesIncidentHistoryAndExportsToSelectedConnection() throws {
+    func testDashboardViewModelScopesIncidentHistoryAndExportsToSelectedConnection() async throws {
         let (suiteName, store) = makeSettingsStore()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
         let manager = try PersistenceManager(isStoredInMemoryOnly: true)
@@ -1150,7 +1156,8 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(viewModel.incidentRecords.first?.serverConnectionId, primaryID)
         XCTAssertNotNil(viewModel.lastIncidentDate)
 
-        let exportURL = try await XCTUnwrap(viewModel.exportIncidentsJSON())
+        let exportResult = await viewModel.exportIncidentsJSON()
+        let exportURL = try XCTUnwrap(exportResult)
         defer { try? FileManager.default.removeItem(at: exportURL) }
 
         let data = try Data(contentsOf: exportURL)
@@ -1191,13 +1198,15 @@ final class KumaNotifyTests: XCTestCase {
             persistence: manager
         )
 
-        let exportURL = try await XCTUnwrap(viewModel.exportIncidentsCSV())
+        let exportResult = await viewModel.exportIncidentsCSV()
+        let exportURL = try XCTUnwrap(exportResult)
         defer { try? FileManager.default.removeItem(at: exportURL) }
 
         let csv = try String(contentsOf: exportURL, encoding: .utf8)
         XCTAssertTrue(csv.contains("\"API, \"\"Edge\"\"\""))
         XCTAssertTrue(csv.contains("\"Primary\nEU\""))
-        XCTAssertTrue(csv.contains(",recovered,42,1970-01-01"))
+        XCTAssertTrue(csv.contains("1970-01-01T00:00:00"))
+        XCTAssertTrue(csv.contains(",recovered,42"))
 
     }
 
@@ -1638,7 +1647,7 @@ final class KumaNotifyTests: XCTestCase {
     }
 
     @MainActor
-    func testNotificationManagerOpenSystemSettingsFallsBackWhenDeepLinkFails() {
+    func testNotificationManagerOpenSystemSettingsFallsBackWhenDeepLinkFails() async {
         let recorder = URLRecorder()
         let manager = NotificationManager(
             openURLHandler: { url in
@@ -1647,14 +1656,15 @@ final class KumaNotifyTests: XCTestCase {
             }
         )
 
-        XCTAssertTrue(manager.openSystemNotificationSettings())
+        let didOpenSettings = await manager.openSystemNotificationSettings()
+        XCTAssertTrue(didOpenSettings)
         XCTAssertEqual(recorder.urls.count, 2)
         XCTAssertEqual(recorder.urls.first?.scheme, "x-apple.systempreferences")
         XCTAssertEqual(recorder.urls.last?.path, "/System/Applications/System Settings.app")
     }
 
     @MainActor
-    func testNotificationManagerSchedulesDownAlertWithExpectedMetadata() {
+    func testNotificationManagerSchedulesDownAlertWithExpectedMetadata() async {
         let recorder = NotificationRequestRecorder()
         let connectionID = UUID()
         let manager = NotificationManager(
@@ -1663,7 +1673,7 @@ final class KumaNotifyTests: XCTestCase {
             }
         )
 
-        manager.sendDownAlert(
+        await manager.sendDownAlert(
             serverConnectionId: connectionID,
             monitorId: "api",
             monitorName: "API",

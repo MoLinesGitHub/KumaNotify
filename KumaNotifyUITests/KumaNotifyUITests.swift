@@ -49,6 +49,38 @@ final class KumaNotifyUITests: XCTestCase {
         XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
     }
 
+    func testSettingsAddServerFlowValidatesAndPersistsConnection() {
+        let app = XCUIApplication()
+        let suiteName = "KumaNotifyUITests.settingsAdd.\(UUID().uuidString)"
+        app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
+        app.launchEnvironment["KUMA_UI_TEST_SHOW_SETTINGS"] = "1"
+        app.launch()
+
+        let addServerButton = app.buttons["settings.addServerButton"]
+        XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
+        addServerButton.click()
+
+        let serverURLField = app.descendants(matching: .any)["settings.serverURLField"]
+        let slugField = app.descendants(matching: .any)["settings.statusPageSlugField"]
+        let saveButton = app.buttons["settings.saveButton"]
+
+        XCTAssertTrue(serverURLField.waitForExistence(timeout: 8))
+        XCTAssertTrue(slugField.exists)
+        XCTAssertTrue(saveButton.exists)
+        XCTAssertFalse(saveButton.isEnabled)
+
+        serverURLField.click()
+        serverURLField.typeText("https://status.example.com")
+        slugField.click()
+        slugField.typeText("production")
+
+        XCTAssertTrue(saveButton.isEnabled)
+        saveButton.click()
+
+        XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
+        XCTAssertFalse(addServerButton.isEnabled)
+    }
+
     func testProductionSettingsSceneShowsServerManagementControls() {
         let app = XCUIApplication()
         let suiteName = "KumaNotifyUITests.productionSettings.\(UUID().uuidString)"
@@ -91,5 +123,55 @@ final class KumaNotifyUITests: XCTestCase {
 
         let secondaryMonitor = app.buttons["dashboard.monitor.secondary-api"]
         XCTAssertTrue(secondaryMonitor.waitForExistence(timeout: 8))
+    }
+
+    func testDashboardIncidentHistoryCanOpenAndDismiss() {
+        let app = XCUIApplication()
+        let suiteName = "KumaNotifyUITests.dashboardHistory.\(UUID().uuidString)"
+        app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
+        app.launchEnvironment["KUMA_UI_TEST_SHOW_DASHBOARD"] = "1"
+        app.launch()
+
+        let incidentHistoryButton = app.buttons["dashboard.incidentHistoryButton"]
+        XCTAssertTrue(incidentHistoryButton.waitForExistence(timeout: 8))
+        incidentHistoryButton.click()
+
+        let historyTitle = app.staticTexts["dashboard.incidentHistoryTitle"]
+        let backButton = app.buttons["dashboard.incidentHistoryBackButton"]
+        XCTAssertTrue(historyTitle.waitForExistence(timeout: 8))
+        XCTAssertTrue(backButton.exists)
+
+        backButton.click()
+
+        let primaryMonitor = app.buttons["dashboard.monitor.primary-api"]
+        XCTAssertTrue(primaryMonitor.waitForExistence(timeout: 8))
+    }
+
+    func testDashboardSearchCanFilterAndClearResults() {
+        let app = XCUIApplication()
+        let suiteName = "KumaNotifyUITests.dashboardSearch.\(UUID().uuidString)"
+        app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
+        app.launchEnvironment["KUMA_UI_TEST_SHOW_DASHBOARD"] = "1"
+        app.launch()
+
+        let primaryAPI = app.buttons["dashboard.monitor.primary-api"]
+        let primaryDB = app.buttons["dashboard.monitor.primary-db"]
+        XCTAssertTrue(primaryAPI.waitForExistence(timeout: 8))
+        XCTAssertTrue(primaryDB.exists)
+
+        let searchField = app.textFields["dashboard.searchField"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 8))
+        searchField.click()
+        searchField.typeText("db")
+
+        XCTAssertTrue(primaryDB.waitForExistence(timeout: 8))
+        XCTAssertFalse(primaryAPI.exists)
+
+        let clearSearchButton = app.buttons["dashboard.clearSearchButton"]
+        XCTAssertTrue(clearSearchButton.waitForExistence(timeout: 8))
+        clearSearchButton.click()
+
+        XCTAssertTrue(primaryAPI.waitForExistence(timeout: 8))
+        XCTAssertTrue(primaryDB.exists)
     }
 }

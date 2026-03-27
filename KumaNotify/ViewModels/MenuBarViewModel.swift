@@ -170,7 +170,7 @@ final class MenuBarViewModel {
                 allTotal += monitors.count
                 allDown += down
 
-                detectStateTransitions(
+                await detectStateTransitions(
                     monitors: monitors,
                     connection: connection
                 )
@@ -251,7 +251,7 @@ final class MenuBarViewModel {
 
     // MARK: - State transitions
 
-    private func detectStateTransitions(monitors: [UnifiedMonitor], connection: ServerConnection) {
+    private func detectStateTransitions(monitors: [UnifiedMonitor], connection: ServerConnection) async {
         let soundOption = settingsStore.notificationSound
         let shouldSendNotifications =
             settingsStore.notificationsEnabled
@@ -304,7 +304,7 @@ final class MenuBarViewModel {
                 // Auto-clear acknowledge on recovery
                 settingsStore.unacknowledgeMonitor(connectionId: connection.id, monitorId: monitor.id)
                 if shouldSendNotifications && !isAcknowledged {
-                    notifications.sendRecoveryAlert(
+                    await notifications.sendRecoveryAlert(
                         serverConnectionId: connection.id,
                         monitorId: monitor.id, monitorName: monitor.name,
                         serverName: connection.name, downDuration: downDuration,

@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class MonitorPreference {
+final class MonitorPreference: @unchecked Sendable {
     @Attribute(.unique) var compositeKey: String
     var monitorId: String
     var serverConnectionId: UUID

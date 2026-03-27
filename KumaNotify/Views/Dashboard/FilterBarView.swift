@@ -30,6 +30,7 @@ struct FilterBarView: View {
                 TextField("Search monitors...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.caption)
+                    .accessibilityIdentifier("dashboard.searchField")
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
@@ -40,6 +41,7 @@ struct FilterBarView: View {
                     }
                     .buttonStyle(.borderless)
                     .accessibilityLabel(String(localized: "Clear search"))
+                    .accessibilityIdentifier("dashboard.clearSearchButton")
                 }
             }
             .padding(.horizontal, 8)
@@ -68,6 +70,7 @@ struct FilterBarView: View {
                 .foregroundStyle(statusFilter == filter ? color : .secondary)
         }
         .buttonStyle(.borderless)
+        .accessibilityIdentifier("dashboard.filter.\(label.lowercased())")
     }
 }
 

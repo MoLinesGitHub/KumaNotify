@@ -452,6 +452,20 @@ private struct UITestDashboardMonitoringService: MonitoringServiceProtocol {
                             validCert: nil,
                             url: nil,
                             lastStatusChange: nil
+                        ),
+                        UnifiedMonitor(
+                            id: "\(connection.statusPageSlug)-db",
+                            name: "\(connection.name) DB",
+                            type: "tcp",
+                            currentStatus: .pending,
+                            latestPing: 95,
+                            uptime24h: 0.995,
+                            uptime7d: 0.995,
+                            uptime30d: 0.995,
+                            certExpiryDays: nil,
+                            validCert: nil,
+                            url: nil,
+                            lastStatusChange: nil
                         )
                     ]
                 )
