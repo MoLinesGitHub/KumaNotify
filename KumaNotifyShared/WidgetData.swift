@@ -1,5 +1,13 @@
 import Foundation
 
+enum WatchWidgetState {
+    case healthy
+    case degraded
+    case down
+    case incident
+    case offline
+}
+
 enum WidgetDataPresentation {
     static func shouldShowSummary(for data: WidgetData) -> Bool {
         data.overallStatusRaw != "unreachable"
@@ -26,37 +34,76 @@ enum WidgetDataPresentation {
         }
     }
 
-    static func criticalEventCount(for data: WidgetData) -> Int {
-        if data.downCount > 0 {
-            return data.downCount
+    static func watchWidgetState(for data: WidgetData) -> WatchWidgetState {
+        if data.overallStatusRaw == "someDown" {
+            return .down
         }
         if data.activeIncidentCount > 0 {
-            return data.activeIncidentCount
+            return .incident
         }
-        return data.hasActiveIncident ? 1 : 0
+        if data.overallStatusRaw == "degraded" {
+            return .degraded
+        }
+        if data.overallStatusRaw == "allUp" {
+            return .healthy
+        }
+        return .offline
+    }
+
+    static func watchCount(for data: WidgetData) -> Int {
+        switch watchWidgetState(for: data) {
+        case .down:
+            return data.downCount
+        case .incident:
+            if data.activeIncidentCount > 0 {
+                return data.activeIncidentCount
+            }
+            return data.hasActiveIncident ? 1 : 0
+        default:
+            return 0
+        }
     }
 
     static func watchStatusLabel(for data: WidgetData) -> String {
-        if data.overallStatusRaw == "someDown" {
+        switch watchWidgetState(for: data) {
+        case .down:
             return statusLabel(for: data)
-        }
-
-        let incidentCount = criticalEventCount(for: data)
-        if data.hasActiveIncident && incidentCount > 0 {
+        case .incident:
             return String.localizedStringWithFormat(
                 String(localized: "%lld incidents"),
-                Int64(incidentCount)
+                Int64(watchCount(for: data))
             )
+        case .degraded, .healthy, .offline:
+            return statusLabel(for: data)
         }
-
-        return statusLabel(for: data)
     }
 
     static func watchStatusColorKey(for data: WidgetData) -> String {
-        if data.overallStatusRaw == "someDown" || data.hasActiveIncident {
+        switch watchWidgetState(for: data) {
+        case .healthy:
+            return "green"
+        case .degraded:
+            return "yellow"
+        case .down, .incident:
             return "red"
+        case .offline:
+            return "gray"
         }
-        return statusColorKey(for: data.overallStatusRaw)
+    }
+
+    static func watchSymbolName(for data: WidgetData) -> String {
+        switch watchWidgetState(for: data) {
+        case .healthy:
+            return "checkmark"
+        case .degraded:
+            return "exclamationmark.circle.fill"
+        case .down:
+            return "exclamationmark.triangle.fill"
+        case .incident:
+            return "number.circle.fill"
+        case .offline:
+            return "antenna.radiowaves.left.and.right.slash"
+        }
     }
 }
 

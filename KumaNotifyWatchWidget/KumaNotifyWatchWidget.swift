@@ -90,31 +90,41 @@ struct KumaNotifyWatchWidgetEntryView: View {
     }
 
     private func inlineView(_ data: WidgetData) -> some View {
-        if data.overallStatusRaw == "someDown" || data.hasActiveIncident {
-            Text(WidgetDataPresentation.watchStatusLabel(for: data))
-        } else {
-            Text(WidgetDataPresentation.shouldShowSummary(for: data)
-                 ? data.monitorSummaryLine
-                 : WidgetDataPresentation.statusLabel(for: data))
+        let watchState = WidgetDataPresentation.watchWidgetState(for: data)
+        return Group {
+            if watchState == .down || watchState == .incident {
+                Text(WidgetDataPresentation.watchStatusLabel(for: data))
+            } else {
+                Text(WidgetDataPresentation.shouldShowSummary(for: data)
+                     ? data.monitorSummaryLine
+                     : WidgetDataPresentation.statusLabel(for: data))
+            }
         }
     }
 
     private func circularView(_ data: WidgetData) -> some View {
-        ZStack {
+        let watchState = WidgetDataPresentation.watchWidgetState(for: data)
+        return ZStack {
             AccessoryWidgetBackground()
-            if data.overallStatusRaw == "someDown" || data.hasActiveIncident {
-                let count = WidgetDataPresentation.criticalEventCount(for: data)
+            switch watchState {
+            case .incident:
+                Text("\(WidgetDataPresentation.watchCount(for: data))")
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(Color.appStatusDown)
+            case .down:
                 VStack(spacing: 2) {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
                         .font(.caption)
                         .foregroundStyle(Color.appStatusDown)
-                    if count > 0 {
-                        Text("\(count)")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.primary)
-                    }
+                    Text("\(WidgetDataPresentation.watchCount(for: data))")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.primary)
                 }
-            } else {
+            case .degraded:
+                Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
+                    .font(.headline)
+                    .foregroundStyle(Color.appStatusDegraded)
+            case .healthy:
                 VStack(spacing: 2) {
                     Text("\(data.upCount)")
                         .font(.headline.monospacedDigit())
@@ -122,6 +132,10 @@ struct KumaNotifyWatchWidgetEntryView: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
+            case .offline:
+                Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -136,22 +150,24 @@ struct KumaNotifyWatchWidgetEntryView: View {
     }
 
     private func cornerView(_ data: WidgetData) -> some View {
-        let criticalCount = WidgetDataPresentation.criticalEventCount(for: data)
-        let isCritical = data.overallStatusRaw == "someDown" || data.hasActiveIncident
+        let watchState = WidgetDataPresentation.watchWidgetState(for: data)
 
         return ZStack {
             AccessoryWidgetBackground()
             Group {
-                if isCritical {
-                    if criticalCount > 0 {
-                        Text("\(criticalCount)")
-                            .font(.headline.monospacedDigit())
-                    } else {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
+                switch watchState {
+                case .incident:
+                    Text("\(WidgetDataPresentation.watchCount(for: data))")
+                        .font(.headline.monospacedDigit())
+                case .down:
+                    VStack(spacing: 1) {
+                        Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
+                            .font(.caption2)
+                        Text("\(WidgetDataPresentation.watchCount(for: data))")
+                            .font(.caption2.monospacedDigit())
                     }
-                } else {
-                    Image(systemName: "checkmark")
+                case .degraded, .healthy, .offline:
+                    Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
                         .font(.caption)
                 }
             }
@@ -159,7 +175,7 @@ struct KumaNotifyWatchWidgetEntryView: View {
         }
         .widgetLabel {
             Text(
-                isCritical
+                watchState == .down || watchState == .incident
                 ? WidgetDataPresentation.watchStatusLabel(for: data)
                 : data.monitorSummaryLine
             )
@@ -167,17 +183,26 @@ struct KumaNotifyWatchWidgetEntryView: View {
     }
 
     private func rectangularView(_ data: WidgetData) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let watchState = WidgetDataPresentation.watchWidgetState(for: data)
+        return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Circle()
-                    .fill(statusColor(data))
-                    .frame(width: 8, height: 8)
+                if watchState == .incident {
+                    Text("\(WidgetDataPresentation.watchCount(for: data))")
+                        .font(.caption.monospacedDigit())
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.appStatusDown)
+                        .frame(minWidth: 14, alignment: .leading)
+                } else {
+                    Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
+                        .font(.caption)
+                        .foregroundStyle(statusColor(data))
+                }
                 Text(WidgetDataPresentation.watchStatusLabel(for: data))
                     .font(.headline)
                     .lineLimit(1)
             }
 
-            if data.overallStatusRaw == "someDown" || data.hasActiveIncident {
+            if watchState == .down || watchState == .incident {
                 Text(data.monitorSummaryLine)
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
