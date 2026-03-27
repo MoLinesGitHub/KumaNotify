@@ -1,5 +1,18 @@
 import SwiftUI
 
+enum SummaryHeaderViewLogic {
+    static func latencyValueText(_ latency: Int) -> String {
+        "\(latency)"
+    }
+
+    static func lastIncidentText(_ date: Date) -> String {
+        String(
+            format: String(localized: "Last incident %@"),
+            date.formatted(.relative(presentation: .named))
+        )
+    }
+}
+
 struct SummaryHeaderView: View {
     let summary: String
     let latency: Int?
@@ -36,7 +49,7 @@ struct SummaryHeaderView: View {
 
                 if let latency {
                     VStack(alignment: .trailing, spacing: 0) {
-                        Text("\(latency)")
+                        Text(SummaryHeaderViewLogic.latencyValueText(latency))
                             .font(.system(.title3, design: .rounded, weight: .bold).monospacedDigit())
                             .foregroundStyle(overallStatus.color)
                         Text("ms avg")
@@ -52,7 +65,7 @@ struct SummaryHeaderView: View {
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
-                    Text(String(format: String(localized: "Last incident %@"), lastIncidentDate.formatted(.relative(presentation: .named))))
+                    Text(SummaryHeaderViewLogic.lastIncidentText(lastIncidentDate))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()

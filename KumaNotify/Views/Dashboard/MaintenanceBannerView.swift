@@ -1,5 +1,19 @@
 import SwiftUI
 
+enum MaintenanceBannerViewLogic {
+    static func shouldShowDescription(_ description: String?) -> Bool {
+        guard let description else { return false }
+        return !description.isEmpty
+    }
+
+    static func endTimeText(_ endDate: Date) -> String {
+        String(
+            format: String(localized: "→ %@"),
+            endDate.formatted(date: .omitted, time: .shortened)
+        )
+    }
+}
+
 struct MaintenanceBannerView: View {
     let maintenances: [UnifiedMaintenance]
 
@@ -27,8 +41,8 @@ struct MaintenanceBannerView: View {
                 Text(maintenance.title)
                     .font(.system(.caption, weight: .medium))
                     .lineLimit(1)
-                if let desc = maintenance.description, !desc.isEmpty {
-                    Text(desc)
+                if MaintenanceBannerViewLogic.shouldShowDescription(maintenance.description) {
+                    Text(maintenance.description ?? "")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
@@ -43,7 +57,7 @@ struct MaintenanceBannerView: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                     if let end = maintenance.endDate {
-                        Text(String(format: String(localized: "→ %@"), end.formatted(date: .omitted, time: .shortened)))
+                        Text(MaintenanceBannerViewLogic.endTimeText(end))
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.tertiary)
                     }

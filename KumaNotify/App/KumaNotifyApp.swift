@@ -25,6 +25,7 @@ struct KumaNotifyApp: App {
     private let uiTestShowsPaywall: Bool
     private let uiTestShowsDashboard: Bool
     private let uiTestSeedsServerConnection: Bool
+    private let uiTestForcesPro: Bool
     @State private var settingsStore: SettingsStore
     @State private var pollingEngine: PollingEngine
     @State private var persistence: PersistenceManager?
@@ -113,10 +114,16 @@ struct KumaNotifyApp: App {
         self.uiTestShowsPaywall = environment["KUMA_UI_TEST_SHOW_PAYWALL"] == "1"
         self.uiTestShowsDashboard = environment["KUMA_UI_TEST_SHOW_DASHBOARD"] == "1"
         self.uiTestSeedsServerConnection = environment["KUMA_UI_TEST_SEED_SERVER"] == "1"
+        self.uiTestForcesPro = environment["KUMA_UI_TEST_FORCE_PRO"] == "1"
 
         let store = SettingsStore(suiteName: settingsSuiteName)
         let engine = PollingEngine()
         let sm = StoreManager()
+        #if DEBUG
+        if uiTestForcesPro || uiTestShowsSettings || uiTestShowsDashboard {
+            sm.debugProOverride = true
+        }
+        #endif
 
         if Self.shouldSeedUITestServerConnection(
             uiTestSeedsServerConnection,
@@ -177,9 +184,6 @@ struct KumaNotifyApp: App {
             }
         }
         if uiTestShowsSettings {
-            #if DEBUG
-            sm.debugProOverride = true
-            #endif
             Task { @MainActor in
                 UITestSettingsWindow.show(settingsStore: store, storeManager: sm)
             }
@@ -190,9 +194,6 @@ struct KumaNotifyApp: App {
             }
         }
         if uiTestShowsDashboard {
-            #if DEBUG
-            sm.debugProOverride = true
-            #endif
             let primary = ServerConnection(
                 name: "Primary",
                 baseURL: URL(string: "https://primary.example.com")!,

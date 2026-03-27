@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct IncidentRowView: View {
-    let incident: IncidentRecord
+    let incident: IncidentRecordSnapshot
 
     var body: some View {
         HStack(spacing: 8) {

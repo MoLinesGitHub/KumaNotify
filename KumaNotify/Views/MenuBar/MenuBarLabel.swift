@@ -1,18 +1,32 @@
 import SwiftUI
 
-struct MenuBarLabel: View {
-    let viewModel: MenuBarViewModel
-
-    private var accessibilityDescription: String {
-        if case .unreachable = viewModel.overallStatus {
-            return viewModel.overallStatus.label
+enum MenuBarLabelLogic {
+    static func accessibilityDescription(
+        overallStatus: OverallStatus,
+        upCount: Int,
+        totalCount: Int
+    ) -> String {
+        if case .unreachable = overallStatus {
+            return overallStatus.label
         }
 
         return String.localizedStringWithFormat(
             String(localized: "%@. %lld of %lld monitors up."),
-            viewModel.overallStatus.label,
-            Int64(viewModel.upCount),
-            Int64(viewModel.totalCount)
+            overallStatus.label,
+            Int64(upCount),
+            Int64(totalCount)
+        )
+    }
+}
+
+struct MenuBarLabel: View {
+    let viewModel: MenuBarViewModel
+
+    private var accessibilityDescription: String {
+        MenuBarLabelLogic.accessibilityDescription(
+            overallStatus: viewModel.overallStatus,
+            upCount: viewModel.upCount,
+            totalCount: viewModel.totalCount
         )
     }
 

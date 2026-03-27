@@ -4,7 +4,7 @@ struct MonitorGroupSection: View {
     let group: UnifiedGroup
     let heartbeats: [String: [UnifiedHeartbeat]]
     var uptimePeriod: UptimePeriod = .twentyFourHours
-    var monitorPreferences: [String: MonitorPreference] = [:]
+    var monitorPreferences: [String: MonitorPreferenceSnapshot] = [:]
     var showProFeatures: Bool = true
     var acknowledgedMonitors: Set<String> = []
     var connectionId: UUID?
@@ -76,7 +76,7 @@ struct MonitorGroupSection: View {
         return .yellow
     }
 
-    private func prefFor(_ monitor: UnifiedMonitor) -> MonitorPreference? {
+    private func prefFor(_ monitor: UnifiedMonitor) -> MonitorPreferenceSnapshot? {
         guard let cid = connectionId else { return monitorPreferences[monitor.id] }
         let key = MonitorPreference.makeCompositeKey(monitorId: monitor.id, serverConnectionId: cid)
         return monitorPreferences[key]

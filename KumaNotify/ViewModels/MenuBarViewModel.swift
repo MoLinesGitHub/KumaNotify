@@ -291,7 +291,7 @@ final class MenuBarViewModel {
                     )
                 }
 
-                await persistence?.recordIncident(IncidentRecord(
+                await persistence?.recordIncident(IncidentRecordSnapshot(
                     monitorId: monitor.id,
                     monitorName: monitor.name,
                     serverConnectionId: connection.id,
@@ -311,7 +311,7 @@ final class MenuBarViewModel {
                         soundOption: soundOption
                     )
                 }
-                await persistence?.recordIncident(IncidentRecord(
+                await persistence?.recordIncident(IncidentRecordSnapshot(
                     monitorId: monitor.id,
                     monitorName: monitor.name,
                     serverConnectionId: connection.id,

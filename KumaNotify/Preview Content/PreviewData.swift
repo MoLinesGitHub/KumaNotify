@@ -52,8 +52,8 @@ enum PreviewData {
         statusPageSlug: "cortes"
     )
 
-    @MainActor static var sampleIncidents: [IncidentRecord] { [
-        IncidentRecord(
+    static var sampleIncidents: [IncidentRecordSnapshot] { [
+        IncidentRecordSnapshot(
             monitorId: "9",
             monitorName: "Servidor Web",
             serverConnectionId: UUID(),
@@ -61,7 +61,7 @@ enum PreviewData {
             transitionType: .wentDown,
             timestamp: Date().addingTimeInterval(-3600)
         ),
-        IncidentRecord(
+        IncidentRecordSnapshot(
             monitorId: "9",
             monitorName: "Servidor Web",
             serverConnectionId: UUID(),
@@ -70,7 +70,7 @@ enum PreviewData {
             timestamp: Date().addingTimeInterval(-1800),
             downDuration: 1800
         ),
-        IncidentRecord(
+        IncidentRecordSnapshot(
             monitorId: "6",
             monitorName: "API Backend",
             serverConnectionId: UUID(),
@@ -78,7 +78,7 @@ enum PreviewData {
             transitionType: .wentDown,
             timestamp: Date().addingTimeInterval(-86400 - 7200)
         ),
-        IncidentRecord(
+        IncidentRecordSnapshot(
             monitorId: "6",
             monitorName: "API Backend",
             serverConnectionId: UUID(),

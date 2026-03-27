@@ -17,7 +17,7 @@ actor PersistenceManager {
 
     // MARK: - Incident Records
 
-    func recordIncident(_ record: IncidentRecord) {
+    func recordIncident(_ record: IncidentRecordSnapshot) {
         // Deduplication: skip if same monitor+transition within 60s
         let windowStart = record.timestamp.addingTimeInterval(-60)
 
@@ -43,19 +43,20 @@ actor PersistenceManager {
             print("Persistence: Dedup check failed for monitor \(record.monitorId): \(error.localizedDescription)")
         }
 
-        modelContext.insert(record)
+        let model = IncidentRecord(snapshot: record)
+        modelContext.insert(model)
         do {
             try modelContext.save()
         } catch {
             print("Persistence: Failed to save incident for '\(record.monitorName)': \(error.localizedDescription)")
-            modelContext.delete(record)
+            modelContext.delete(model)
         }
     }
 
     func fetchRecentIncidents(
         serverConnectionId: UUID? = nil,
         limit: Int = 100
-    ) -> [IncidentRecord] {
+    ) -> [IncidentRecordSnapshot] {
         do {
             let descriptor: FetchDescriptor<IncidentRecord>
             if let serverConnectionId {
@@ -72,7 +73,7 @@ actor PersistenceManager {
 
             var boundedDescriptor = descriptor
             boundedDescriptor.fetchLimit = limit
-            return try modelContext.fetch(boundedDescriptor)
+            return try modelContext.fetch(boundedDescriptor).map(IncidentRecordSnapshot.init)
         } catch {
             print("Persistence: Failed to fetch incidents: \(error.localizedDescription)")
             return []
@@ -95,11 +96,17 @@ actor PersistenceManager {
 
     // MARK: - Monitor Preferences
 
-    func fetchAllPreferences() -> [String: MonitorPreference] {
+    func fetchAllPreferences() -> [String: MonitorPreferenceSnapshot] {
         let descriptor = FetchDescriptor<MonitorPreference>()
         do {
             let results = try modelContext.fetch(descriptor)
-            return Dictionary(results.map { ($0.compositeKey, $0) }, uniquingKeysWith: { _, new in new })
+            return Dictionary(
+                results.map { preference in
+                    let snapshot = MonitorPreferenceSnapshot(preference)
+                    return (snapshot.compositeKey, snapshot)
+                },
+                uniquingKeysWith: { _, new in new }
+            )
         } catch {
             print("Persistence: Failed to fetch preferences: \(error.localizedDescription)")
             return [:]

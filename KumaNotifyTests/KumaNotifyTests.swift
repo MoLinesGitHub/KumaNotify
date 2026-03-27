@@ -421,7 +421,7 @@ final class KumaNotifyTests: XCTestCase {
         let timestamp = Date()
         let serverConnectionId = UUID()
 
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "api",
             monitorName: "API",
             serverConnectionId: serverConnectionId,
@@ -429,7 +429,7 @@ final class KumaNotifyTests: XCTestCase {
             transitionType: .wentDown,
             timestamp: timestamp
         ))
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "api",
             monitorName: "API",
             serverConnectionId: serverConnectionId,
@@ -446,7 +446,7 @@ final class KumaNotifyTests: XCTestCase {
     func testPersistenceManagerPurgesOnlyExpiredIncidents() async throws {
         let manager = try PersistenceManager(isStoredInMemoryOnly: true)
 
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "old",
             monitorName: "Old Monitor",
             serverConnectionId: UUID(),
@@ -454,7 +454,7 @@ final class KumaNotifyTests: XCTestCase {
             transitionType: .wentDown,
             timestamp: Calendar.current.date(byAdding: .day, value: -91, to: Date())!
         ))
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "recent",
             monitorName: "Recent Monitor",
             serverConnectionId: UUID(),
@@ -1089,14 +1089,14 @@ final class KumaNotifyTests: XCTestCase {
         let primaryID = UUID()
         let secondaryID = UUID()
 
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "primary-api",
             monitorName: "Primary API",
             serverConnectionId: primaryID,
             serverName: "Primary",
             transitionType: .wentDown
         ))
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "secondary-api",
             monitorName: "Secondary API",
             serverConnectionId: secondaryID,
@@ -1125,7 +1125,7 @@ final class KumaNotifyTests: XCTestCase {
             statusPageSlug: "primary"
         )
 
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "secondary-api",
             monitorName: "Secondary API",
             serverConnectionId: secondaryID,
@@ -1133,7 +1133,7 @@ final class KumaNotifyTests: XCTestCase {
             transitionType: .wentDown,
             timestamp: Date().addingTimeInterval(-300)
         ))
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "primary-api",
             monitorName: "Primary API",
             serverConnectionId: primaryID,
@@ -1182,7 +1182,7 @@ final class KumaNotifyTests: XCTestCase {
             statusPageSlug: "primary"
         )
 
-        await manager.recordIncident(IncidentRecord(
+        await manager.recordIncident(IncidentRecordSnapshot(
             monitorId: "api",
             monitorName: "API, \"Edge\"",
             serverConnectionId: connectionID,
@@ -1432,7 +1432,7 @@ final class KumaNotifyTests: XCTestCase {
         ]
         viewModel.maintenances = [UnifiedMaintenance(id: "m1", title: "Maintenance", description: nil, startDate: nil, endDate: nil)]
         viewModel.incidentRecords = [
-            IncidentRecord(
+            IncidentRecordSnapshot(
                 monitorId: "api",
                 monitorName: "API",
                 serverConnectionId: connection.id,
@@ -1472,7 +1472,7 @@ final class KumaNotifyTests: XCTestCase {
         )
         let viewModel = DashboardViewModel(connection: primary, settingsStore: store)
         viewModel.incidentRecords = [
-            IncidentRecord(
+            IncidentRecordSnapshot(
                 monitorId: "api",
                 monitorName: "API",
                 serverConnectionId: primary.id,
@@ -1844,7 +1844,7 @@ final class KumaNotifyTests: XCTestCase {
         viewModel.statusFilter = .down
         XCTAssertEqual(viewModel.filteredGroups.first?.monitors.map(\.id), ["worker"])
 
-        let pref = MonitorPreference(
+        let pref = MonitorPreferenceSnapshot(
             monitorId: "worker",
             serverConnectionId: connection.id,
             isPinned: false,
@@ -2468,5 +2468,64 @@ final class KumaNotifyTests: XCTestCase {
             slug: "nested/path",
             serverName: "Primary"
         ))
+    }
+
+    func testMenuBarLabelLogicBuildsReachableAndUnreachableAccessibilityDescriptions() {
+        XCTAssertEqual(
+            MenuBarLabelLogic.accessibilityDescription(
+                overallStatus: .unreachable,
+                upCount: 0,
+                totalCount: 0
+            ),
+            OverallStatus.unreachable.label
+        )
+
+        let reachableDescription = MenuBarLabelLogic.accessibilityDescription(
+            overallStatus: .someDown(count: 1, total: 3),
+            upCount: 2,
+            totalCount: 3
+        )
+        XCTAssertTrue(reachableDescription.contains("2"))
+        XCTAssertTrue(reachableDescription.contains("3"))
+        XCTAssertTrue(reachableDescription.contains(OverallStatus.someDown(count: 1, total: 3).label))
+    }
+
+    func testSummaryAndMaintenanceViewLogicFormatsLeafPresentationText() {
+        let referenceDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let incidentText = SummaryHeaderViewLogic.lastIncidentText(referenceDate)
+        let endTimeText = MaintenanceBannerViewLogic.endTimeText(referenceDate)
+
+        XCTAssertEqual(SummaryHeaderViewLogic.latencyValueText(128), "128")
+        XCTAssertFalse(incidentText.isEmpty)
+        XCTAssertFalse(incidentText.contains("%@"))
+        XCTAssertFalse(MaintenanceBannerViewLogic.shouldShowDescription(nil))
+        XCTAssertFalse(MaintenanceBannerViewLogic.shouldShowDescription(""))
+        XCTAssertTrue(MaintenanceBannerViewLogic.shouldShowDescription("Scheduled"))
+        XCTAssertTrue(endTimeText.hasPrefix("→"))
+    }
+
+    func testCertExpiryBadgeLogicMapsSeverityAndAccessibilityText() {
+        XCTAssertEqual(CertExpiryBadgeLogic.severity(for: 3), .urgent)
+        XCTAssertEqual(CertExpiryBadgeLogic.severity(for: 10), .warning)
+        XCTAssertEqual(CertExpiryBadgeLogic.severity(for: 20), .notice)
+        XCTAssertEqual(CertExpiryBadgeLogic.compactText(daysRemaining: 12), "12d")
+        XCTAssertTrue(CertExpiryBadgeLogic.accessibilityLabel(daysRemaining: 12).contains("12"))
+    }
+
+    func testUptimeBadgeLogicMapsDisplayTextColorTierAndAccessibilityValue() {
+        let displayText = UptimeBadgeLogic.displayText(for: 0.999)
+        XCTAssertTrue(displayText.contains("99"))
+        XCTAssertTrue(displayText.contains("%"))
+        XCTAssertEqual(UptimeBadgeLogic.colorTier(for: 0.999), .healthy)
+        XCTAssertEqual(UptimeBadgeLogic.colorTier(for: 0.995), .healthySoft)
+        XCTAssertEqual(UptimeBadgeLogic.colorTier(for: 0.97), .warning)
+        XCTAssertEqual(UptimeBadgeLogic.colorTier(for: 0.8), .critical)
+
+        let accessibilityValue = UptimeBadgeLogic.accessibilityValue(
+            percentage: 0.995,
+            period: .twentyFourHours
+        )
+        XCTAssertTrue(accessibilityValue.contains("%"))
+        XCTAssertTrue(accessibilityValue.contains(UptimePeriod.twentyFourHours.rawValue))
     }
 }

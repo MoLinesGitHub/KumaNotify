@@ -39,7 +39,7 @@ actor NotificationManager: NotificationManaging {
 
     private let requestAuthorizationHandler: @Sendable () async throws -> Bool
     private let authorizationStatusHandler: @Sendable () async -> UNAuthorizationStatus
-    private let openURLHandler: @Sendable (URL) -> Bool
+    private let openURLHandler: @Sendable (URL) async -> Bool
     private let scheduleRequestHandler: @Sendable (UNNotificationRequest) -> Void
 
     init(
@@ -50,12 +50,10 @@ actor NotificationManager: NotificationManaging {
         authorizationStatusHandler: @escaping @Sendable () async -> UNAuthorizationStatus = {
             await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         },
-        openURLHandler: @escaping @Sendable (URL) -> Bool = { url in
-            // Open URL must happen on MainActor
-            Task { @MainActor in
-                _ = NSWorkspace.shared.open(url)
+        openURLHandler: @escaping @Sendable (URL) async -> Bool = { url in
+            await MainActor.run {
+                NSWorkspace.shared.open(url)
             }
-            return true
         },
         scheduleRequestHandler: @escaping @Sendable (UNNotificationRequest) -> Void = { request in
             let requestIdentifier = request.identifier
@@ -110,15 +108,15 @@ actor NotificationManager: NotificationManaging {
     }
 
     @discardableResult
-    func openSystemNotificationSettings() -> Bool {
+    func openSystemNotificationSettings() async -> Bool {
         if let deepLink = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
-            if openURLHandler(deepLink) {
+            if await openURLHandler(deepLink) {
                 return true
             }
         }
 
         let systemSettingsURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
-        return openURLHandler(systemSettingsURL)
+        return await openURLHandler(systemSettingsURL)
     }
 
     func sendDownAlert(

@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct IncidentHistoryView: View {
-    let incidents: [IncidentRecord]
+    let incidents: [IncidentRecordSnapshot]
     let onDismiss: () -> Void
 
-    private var groupedByDate: [(key: String, incidents: [IncidentRecord])] {
+    private var groupedByDate: [(key: String, incidents: [IncidentRecordSnapshot])] {
         let calendar = Calendar.current
-        func dateKey(for incident: IncidentRecord) -> String {
+        func dateKey(for incident: IncidentRecordSnapshot) -> String {
             if calendar.isDateInToday(incident.timestamp) {
                 return String(localized: "Today")
             } else if calendar.isDateInYesterday(incident.timestamp) {
@@ -50,7 +50,7 @@ struct IncidentHistoryView: View {
                     LazyVStack(spacing: 0, pinnedViews: .sectionHeaders) {
                         ForEach(groupedByDate, id: \.key) { section in
                             Section {
-                                ForEach(section.incidents, id: \.persistentModelID) { incident in
+                                ForEach(section.incidents) { incident in
                                     IncidentRowView(incident: incident)
                                 }
                             } header: {

@@ -93,6 +93,40 @@ final class KumaNotifyUITests: XCTestCase {
         XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
     }
 
+    func testProductionSettingsSceneCanAddSecondServerThroughRealFlow() {
+        let app = XCUIApplication()
+        let suiteName = "KumaNotifyUITests.productionSettingsAdd.\(UUID().uuidString)"
+        app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
+        app.launchEnvironment["KUMA_UI_TEST_SEED_SERVER"] = "1"
+        app.launchEnvironment["KUMA_UI_TEST_FORCE_PRO"] = "1"
+        app.launch()
+        app.typeKey(",", modifierFlags: .command)
+
+        let addServerButton = app.buttons["settings.addServerButton"]
+        XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
+        addServerButton.click()
+
+        let serverURLField = app.descendants(matching: .any)["settings.serverURLField"]
+        let slugField = app.descendants(matching: .any)["settings.statusPageSlugField"]
+        let displayNameField = app.descendants(matching: .any)["settings.displayNameField"]
+        let saveButton = app.buttons["settings.saveButton"]
+
+        XCTAssertTrue(serverURLField.waitForExistence(timeout: 8))
+        serverURLField.click()
+        serverURLField.typeText("https://secondary.example.com")
+        slugField.click()
+        slugField.typeText("secondary")
+        displayNameField.click()
+        displayNameField.typeText("Secondary")
+
+        XCTAssertTrue(saveButton.isEnabled)
+        saveButton.click()
+
+        XCTAssertTrue(app.staticTexts["Secondary"].waitForExistence(timeout: 8))
+        XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
+        XCTAssertTrue(addServerButton.isEnabled)
+    }
+
     func testPaywallWindowShowsPurchaseActions() {
         let app = XCUIApplication()
         let suiteName = "KumaNotifyUITests.paywall.\(UUID().uuidString)"

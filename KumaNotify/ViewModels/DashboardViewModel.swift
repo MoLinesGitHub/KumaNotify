@@ -28,13 +28,13 @@ final class DashboardViewModel {
     var errorMessage: String?
 
     // Phase 3: Persistence state
-    var monitorPreferences: [String: MonitorPreference] = [:] {
+    var monitorPreferences: [String: MonitorPreferenceSnapshot] = [:] {
         didSet { recomputeFilteredGroups() }
     }
     var showHiddenMonitors = false {
         didSet { recomputeFilteredGroups() }
     }
-    var incidentRecords: [IncidentRecord] = []
+    var incidentRecords: [IncidentRecordSnapshot] = []
     var showIncidentHistory = false
     var lastIncidentDate: Date?
     private(set) var summaryText = ""
