@@ -108,16 +108,20 @@ struct KumaNotifyWatchWidgetEntryView: View {
             AccessoryWidgetBackground()
             switch watchState {
             case .incident:
-                Text("\(WidgetDataPresentation.watchCount(for: data))")
-                    .font(.headline.monospacedDigit())
+                Text(WidgetDataPresentation.watchCountLabel(for: data))
+                    .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
                     .foregroundStyle(Color.appStatusDown)
             case .down:
                 VStack(spacing: 2) {
                     Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
                         .font(.caption)
                         .foregroundStyle(Color.appStatusDown)
-                    Text("\(WidgetDataPresentation.watchCount(for: data))")
+                    Text(WidgetDataPresentation.watchCountLabel(for: data))
                         .font(.caption2.monospacedDigit())
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
                         .foregroundStyle(.primary)
                 }
             case .degraded:
@@ -157,14 +161,19 @@ struct KumaNotifyWatchWidgetEntryView: View {
             Group {
                 switch watchState {
                 case .incident:
-                    Text("\(WidgetDataPresentation.watchCount(for: data))")
-                        .font(.headline.monospacedDigit())
+                    Text(WidgetDataPresentation.watchCountLabel(for: data))
+                        .font(cornerIncidentFont(for: data))
+                        .minimumScaleFactor(0.65)
+                        .lineLimit(1)
+                        .frame(minWidth: cornerIncidentMinWidth(for: data))
                 case .down:
                     VStack(spacing: 1) {
                         Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
                             .font(.caption2)
-                        Text("\(WidgetDataPresentation.watchCount(for: data))")
+                        Text(WidgetDataPresentation.watchCountLabel(for: data))
                             .font(.caption2.monospacedDigit())
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
                     }
                 case .degraded, .healthy, .offline:
                     Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
@@ -187,11 +196,13 @@ struct KumaNotifyWatchWidgetEntryView: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 if watchState == .incident {
-                    Text("\(WidgetDataPresentation.watchCount(for: data))")
+                    Text(WidgetDataPresentation.watchCountLabel(for: data))
                         .font(.caption.monospacedDigit())
                         .fontWeight(.bold)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
                         .foregroundStyle(Color.appStatusDown)
-                        .frame(minWidth: 14, alignment: .leading)
+                        .frame(minWidth: 18, alignment: .leading)
                 } else {
                     Image(systemName: WidgetDataPresentation.watchSymbolName(for: data))
                         .font(.caption)
@@ -252,6 +263,22 @@ struct KumaNotifyWatchWidgetEntryView: View {
         case "red": .appStatusDown
         default: .appStatusOffline
         }
+    }
+
+    private func cornerIncidentFont(for data: WidgetData) -> Font {
+        let label = WidgetDataPresentation.watchCountLabel(for: data)
+        if label.count >= 3 {
+            return .caption.monospacedDigit()
+        }
+        if label.count == 2 {
+            return .system(size: 15, weight: .bold, design: .rounded).monospacedDigit()
+        }
+        return .headline.monospacedDigit()
+    }
+
+    private func cornerIncidentMinWidth(for data: WidgetData) -> CGFloat {
+        let label = WidgetDataPresentation.watchCountLabel(for: data)
+        return label.count >= 3 ? 22 : 18
     }
 }
 

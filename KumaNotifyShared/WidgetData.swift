@@ -64,6 +64,11 @@ enum WidgetDataPresentation {
         }
     }
 
+    static func watchCountLabel(for data: WidgetData) -> String {
+        let count = watchCount(for: data)
+        return count > 99 ? "99+" : "\(count)"
+    }
+
     static func watchStatusLabel(for data: WidgetData) -> String {
         switch watchWidgetState(for: data) {
         case .down:
@@ -100,7 +105,7 @@ enum WidgetDataPresentation {
         case .down:
             return "exclamationmark.triangle.fill"
         case .incident:
-            return "number.circle.fill"
+            return "exclamationmark.bubble.fill"
         case .offline:
             return "antenna.radiowaves.left.and.right.slash"
         }
