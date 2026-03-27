@@ -178,12 +178,42 @@
         }
       }
     },
+    "%lld/%lld OK" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld/%lld OK"
+          }
+        }
+      }
+    },
     "%lld up, %lld down, %lld total" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld activos, %2$lld caídos, %3$lld total"
+          }
+        }
+      }
+    },
+    "%lld up / %lld total" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld activos / %2$lld total"
+          }
+        }
+      }
+    },
+    "%@ — %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ — %2$@"
           }
         }
       }
@@ -273,7 +303,17 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Todos los sistemas operativos"
+            "value" : "Todos los sistemas están operativos"
+          }
+        }
+      }
+    },
+    "Allow notifications for Kuma Notify in System Settings, then enable them again here." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permite las notificaciones para Kuma Notify en Ajustes del Sistema y luego actívalas aquí de nuevo."
           }
         }
       }
@@ -677,6 +717,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Filtros, búsqueda y monitores agrupados"
+          }
+        }
+      }
+    },
+    "Free" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gratis"
           }
         }
       }
@@ -1101,6 +1151,26 @@
         }
       }
     },
+    "Notifications Disabled in System Settings" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notificaciones desactivadas en Ajustes del Sistema"
+          }
+        }
+      }
+    },
+    "Notifications are currently blocked by System Settings." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las notificaciones están bloqueadas actualmente por Ajustes del Sistema."
+          }
+        }
+      }
+    },
     "Offline" : {
       "comment" : "Widget status label when the server is unreachable.",
       "extractionState" : "stale",
@@ -1152,6 +1222,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abrir Ajustes..."
+          }
+        }
+      }
+    },
+    "Open System Settings" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Ajustes del Sistema"
           }
         }
       }
@@ -1228,6 +1308,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pro necesario para múltiples servidores"
+          }
+        }
+      }
+    },
+    "Pro" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro"
           }
         }
       }
@@ -1369,6 +1459,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restaurar compra"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentar"
           }
         }
       }

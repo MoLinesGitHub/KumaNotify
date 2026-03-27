@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @Bindable var settingsStore: SettingsStore
@@ -7,8 +8,15 @@ struct SettingsView: View {
 
     @State private var editingConnection: ServerConnection?
     @State private var isAddingNew = false
+    @State private var showNotificationSettingsHelp = false
 
-    private var isPro: Bool { storeManager?.proUnlocked ?? false }
+    private var isPro: Bool {
+        #if DEBUG
+        storeManager?.effectiveProUnlocked ?? false
+        #else
+        storeManager?.proUnlocked ?? false
+        #endif
+    }
 
     var body: some View {
         TabView {
@@ -20,6 +28,14 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gear") }
         }
         .frame(width: 440, height: 380)
+        .task {
+            await refreshNotificationAuthorizationStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { @MainActor in
+                await refreshNotificationAuthorizationStatus()
+            }
+        }
         .sheet(item: $editingConnection) { connection in
             ServerFormView(
                 connection: connection,
@@ -42,6 +58,19 @@ struct SettingsView: View {
                 onCancel: { isAddingNew = false }
             )
         }
+        .alert(String(localized: "Notifications Disabled in System Settings"), isPresented: $showNotificationSettingsHelp) {
+            Button(String(localized: "Open System Settings")) {
+                NotificationManager.shared.openSystemNotificationSettings()
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {}
+        } message: {
+            Text("Allow notifications for Kuma Notify in System Settings, then enable them again here.")
+        }
+    }
+
+    @MainActor
+    private func refreshNotificationAuthorizationStatus() async {
+        settingsStore.notificationAuthorizationStatus = await NotificationManager.shared.notificationAuthorizationStatus()
     }
 
     // MARK: - Server Tab
@@ -192,8 +221,45 @@ struct SettingsView: View {
             Section("Notifications") {
                 Toggle("Enable notifications", isOn: Binding(
                     get: { settingsStore.notificationsEnabled },
-                    set: { settingsStore.notificationsEnabled = $0 }
+                    set: { newValue in
+                        guard newValue else {
+                            settingsStore.notificationsEnabled = false
+                            return
+                        }
+
+                        Task { @MainActor in
+                            switch settingsStore.notificationAuthorizationStatus {
+                            case .authorized:
+                                settingsStore.notificationsEnabled = true
+                            case .notDetermined:
+                                let status = await NotificationManager.shared.requestPermission()
+                                settingsStore.notificationAuthorizationStatus = status
+                                settingsStore.notificationsEnabled = (status == .authorized)
+                                showNotificationSettingsHelp = (status == .denied)
+                            case .denied:
+                                settingsStore.notificationsEnabled = false
+                                showNotificationSettingsHelp = true
+                            }
+                        }
+                    }
                 ))
+
+                if settingsStore.notificationAuthorizationStatus == .denied {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Notifications are currently blocked by System Settings.")
+                                .font(.caption)
+                            Button("Open System Settings") {
+                                NotificationManager.shared.openSystemNotificationSettings()
+                            }
+                            .buttonStyle(.link)
+                            .font(.caption)
+                        }
+                        Spacer()
+                    }
+                }
 
                 if isPro {
                     Picker("Sound", selection: Binding(
@@ -206,9 +272,23 @@ struct SettingsView: View {
                     }
 
                     Button("Test Notification") {
-                        NotificationManager.shared.sendTestNotification(
-                            soundOption: settingsStore.notificationSound
-                        )
+                        Task { @MainActor in
+                            var status = settingsStore.notificationAuthorizationStatus
+                            if status == .notDetermined {
+                                status = await NotificationManager.shared.requestPermission()
+                                settingsStore.notificationAuthorizationStatus = status
+                            }
+
+                            guard status == .authorized else {
+                                showNotificationSettingsHelp = (status == .denied)
+                                return
+                            }
+
+                            settingsStore.notificationsEnabled = true
+                            NotificationManager.shared.sendTestNotification(
+                                soundOption: settingsStore.notificationSound
+                            )
+                        }
                     }
                 }
             }
@@ -265,6 +345,10 @@ struct ServerFormView: View {
     @State private var testResult: (success: Bool, message: String)?
 
     private var isEditing: Bool { connection != nil }
+    private var normalizedSlug: String { slug.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var normalizedServerName: String { ServerConnection.normalizedDisplayName(from: serverName) }
+    private var validatedServerURL: URL? { ServerConnection.validatedBaseURL(from: serverURL) }
+    private var canSubmit: Bool { validatedServerURL != nil && !normalizedSlug.isEmpty }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -287,7 +371,7 @@ struct ServerFormView: View {
                 Button("Test Connection") {
                     Task { await testConnection() }
                 }
-                .disabled(serverURL.isEmpty || slug.isEmpty || isTesting)
+                .disabled(!canSubmit || isTesting)
                 .accessibilityIdentifier("settings.testConnectionButton")
 
                 if let testResult {
@@ -308,7 +392,7 @@ struct ServerFormView: View {
                 Button("Save") { save() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(serverURL.isEmpty || slug.isEmpty)
+                    .disabled(!canSubmit)
                     .accessibilityIdentifier("settings.saveButton")
             }
         }
@@ -324,26 +408,26 @@ struct ServerFormView: View {
     }
 
     private func save() {
-        guard let url = URL(string: serverURL) else { return }
+        guard let url = validatedServerURL else { return }
         let conn = ServerConnection(
             id: connection?.id ?? UUID(),
-            name: serverName.isEmpty ? String(localized: "My Kuma Server") : serverName,
+            name: normalizedServerName,
             baseURL: url,
-            statusPageSlug: slug,
+            statusPageSlug: normalizedSlug,
             isDefault: connection?.isDefault ?? false
         )
         onSave(conn)
     }
 
     private func testConnection() async {
-        guard let url = URL(string: serverURL) else {
-            testResult = (false, "Invalid URL")
+        guard let url = validatedServerURL else {
+            testResult = (false, String(localized: "Invalid URL"))
             return
         }
         let conn = ServerConnection(
-            name: serverName,
+            name: normalizedServerName,
             baseURL: url,
-            statusPageSlug: slug
+            statusPageSlug: normalizedSlug
         )
         isTesting = true
         defer { isTesting = false }

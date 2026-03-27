@@ -26,15 +26,11 @@ final class HTTPClient: HTTPClientProtocol, Sendable {
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
-        } catch let error as URLError where error.code == .timedOut {
-            throw APIError.timeout
-        } catch let error as URLError where error.code == .cannotConnectToHost
-            || error.code == .networkConnectionLost
-            || error.code == .notConnectedToInternet {
-            throw APIError.serverUnreachable
-        } catch let error as URLError where error.failingURL?.host()?.contains("icloud") == true
-            || error.failingURL?.host()?.contains("mask") == true {
-            throw APIError.privateRelayBlocked
+        } catch let error as URLError {
+            if let mappedError = Self.apiError(for: error) {
+                throw mappedError
+            }
+            throw APIError.networkError(error)
         } catch {
             throw APIError.networkError(error)
         }
@@ -46,7 +42,7 @@ final class HTTPClient: HTTPClientProtocol, Sendable {
         // Detect Private Relay proxy blocking local network (returns 503)
         if httpResponse.statusCode == 503,
            let requestHost = request.url?.host(),
-           requestHost.hasPrefix("192.168.") || requestHost.hasPrefix("10.") || requestHost.hasPrefix("172.") {
+           Self.isPrivateLANHost(requestHost) {
             throw APIError.privateRelayBlocked
         }
 
@@ -59,5 +55,46 @@ final class HTTPClient: HTTPClientProtocol, Sendable {
         } catch {
             throw APIError.decodingError(error)
         }
+    }
+
+    private static func isPrivateLANHost(_ host: String) -> Bool {
+        if host == "localhost" || host.hasSuffix(".local") {
+            return true
+        }
+
+        let octets = host.split(separator: ".").compactMap { Int($0) }
+        guard octets.count == 4 else { return false }
+
+        switch (octets[0], octets[1]) {
+        case (10, _):
+            return true
+        case (192, 168):
+            return true
+        case (172, 16...31):
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func apiError(for error: URLError) -> APIError? {
+        if isPrivateRelayHost(error.failingURL?.host()) {
+            return .privateRelayBlocked
+        }
+
+        switch error.code {
+        case .timedOut:
+            return .timeout
+        case .cannotConnectToHost, .networkConnectionLost, .notConnectedToInternet:
+            return .serverUnreachable
+        default:
+            return nil
+        }
+    }
+
+    private static func isPrivateRelayHost(_ host: String?) -> Bool {
+        guard let host else { return false }
+        let normalizedHost = host.lowercased()
+        return normalizedHost.contains("icloud") || normalizedHost.contains("mask")
     }
 }

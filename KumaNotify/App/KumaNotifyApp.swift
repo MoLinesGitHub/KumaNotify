@@ -1,11 +1,16 @@
 import SwiftUI
 import SwiftData
+import WidgetKit
 import os
 
 @MainActor
 @main
 struct KumaNotifyApp: App {
     private let uiTestShowsOnboarding: Bool
+    private let uiTestShowsSettings: Bool
+    private let uiTestShowsPaywall: Bool
+    private let uiTestShowsDashboard: Bool
+    private let uiTestSeedsServerConnection: Bool
     @State private var settingsStore: SettingsStore
     @State private var pollingEngine: PollingEngine
     @State private var persistence: PersistenceManager?
@@ -50,6 +55,9 @@ struct KumaNotifyApp: App {
             } else {
                 Image(systemName: "antenna.radiowaves.left.and.right.slash")
                     .foregroundStyle(.gray)
+                    .task(id: showOnboarding) {
+                        presentOnboardingIfNeeded()
+                    }
             }
         }
         .menuBarExtraStyle(.window)
@@ -87,10 +95,24 @@ struct KumaNotifyApp: App {
         let environment = ProcessInfo.processInfo.environment
         let settingsSuiteName = environment["KUMA_SETTINGS_SUITE_NAME"] ?? AppConstants.appGroupId
         self.uiTestShowsOnboarding = environment["KUMA_UI_TEST_SHOW_ONBOARDING"] == "1"
+        self.uiTestShowsSettings = environment["KUMA_UI_TEST_SHOW_SETTINGS"] == "1"
+        self.uiTestShowsPaywall = environment["KUMA_UI_TEST_SHOW_PAYWALL"] == "1"
+        self.uiTestShowsDashboard = environment["KUMA_UI_TEST_SHOW_DASHBOARD"] == "1"
+        self.uiTestSeedsServerConnection = environment["KUMA_UI_TEST_SEED_SERVER"] == "1"
 
         let store = SettingsStore(suiteName: settingsSuiteName)
         let engine = PollingEngine()
         let sm = StoreManager()
+
+        if uiTestSeedsServerConnection && store.serverConnections.isEmpty {
+            store.addConnection(ServerConnection(
+                name: "Primary",
+                baseURL: URL(string: "https://primary.example.com")!,
+                statusPageSlug: "primary"
+            ))
+            store.hasCompletedOnboarding = true
+        }
+
         _settingsStore = State(initialValue: store)
         _pollingEngine = State(initialValue: engine)
         _storeManager = State(initialValue: sm)
@@ -104,24 +126,87 @@ struct KumaNotifyApp: App {
         }
 
         if let connection = store.serverConnection {
-            _menuBarVM = State(initialValue: MenuBarViewModel(
+            let menuBarVM = MenuBarViewModel(
                 settingsStore: store,
                 pollingEngine: engine,
                 persistence: _persistence.wrappedValue,
                 storeManager: sm
-            ))
-            _dashboardVM = State(initialValue: DashboardViewModel(
+            )
+            let dashboardVM = DashboardViewModel(
                 connection: connection,
                 settingsStore: store,
                 persistence: _persistence.wrappedValue
-            ))
+            )
+            _menuBarVM = State(initialValue: menuBarVM)
+            _dashboardVM = State(initialValue: dashboardVM)
+            bootstrapMonitoring(menuBarVM)
         } else {
+            Self.clearSharedWidgetData()
             _showOnboarding = State(initialValue: !store.hasCompletedOnboarding)
+        }
+
+        Task { @MainActor in
+            store.notificationAuthorizationStatus = await NotificationManager.shared.notificationAuthorizationStatus()
         }
 
         if uiTestShowsOnboarding {
             Task { @MainActor in
                 UITestOnboardingWindow.show(settingsStore: store)
+            }
+        }
+        if uiTestShowsSettings {
+            #if DEBUG
+            sm.debugProOverride = true
+            #endif
+            Task { @MainActor in
+                UITestSettingsWindow.show(settingsStore: store, storeManager: sm)
+            }
+        }
+        if uiTestShowsPaywall {
+            Task { @MainActor in
+                UITestPaywallWindow.show(storeManager: sm)
+            }
+        }
+        if uiTestShowsDashboard {
+            #if DEBUG
+            sm.debugProOverride = true
+            #endif
+            let primary = ServerConnection(
+                name: "Primary",
+                baseURL: URL(string: "https://primary.example.com")!,
+                statusPageSlug: "primary"
+            )
+            let secondary = ServerConnection(
+                name: "Secondary",
+                baseURL: URL(string: "https://secondary.example.com")!,
+                statusPageSlug: "secondary",
+                isDefault: false
+            )
+            if store.serverConnections.isEmpty {
+                store.addConnection(primary)
+                store.addConnection(secondary)
+            }
+            let service = UITestDashboardMonitoringService()
+            let menuBarVM = MenuBarViewModel(
+                settingsStore: store,
+                pollingEngine: engine,
+                serviceFactory: { _ in service },
+                shouldStartMonitors: false
+            )
+            let dashboardVM = DashboardViewModel(
+                connection: primary,
+                settingsStore: store,
+                serviceFactory: { _ in service }
+            )
+            _menuBarVM = State(initialValue: menuBarVM)
+            _dashboardVM = State(initialValue: dashboardVM)
+            Task { @MainActor in
+                UITestDashboardWindow.show(
+                    menuBarVM: menuBarVM,
+                    dashboardVM: dashboardVM,
+                    storeManager: sm,
+                    settingsStore: store
+                )
             }
         }
     }
@@ -133,6 +218,7 @@ struct KumaNotifyApp: App {
         guard let connection = settingsStore.serverConnection else {
             menuBarVM = nil
             dashboardVM = nil
+            Self.clearSharedWidgetData()
             return
         }
 
@@ -151,16 +237,25 @@ struct KumaNotifyApp: App {
         menuBarVM = mbVM
         dashboardVM = dbVM
 
+        bootstrapMonitoring(mbVM)
+    }
+
+    private func bootstrapMonitoring(_ menuBarVM: MenuBarViewModel) {
         persistence?.purgeOldIncidents()
+        menuBarVM.startPolling()
+    }
 
-        Task {
-            let granted = await NotificationManager.shared.requestPermission()
-            if !granted {
-                Logger.app.warning("Notification permission not granted")
-            }
-        }
+    private func presentOnboardingIfNeeded() {
+        guard showOnboarding, !uiTestShowsOnboarding else { return }
+        showOnboarding = false
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "onboarding")
+    }
 
-        mbVM.startPolling()
+    private static func clearSharedWidgetData() {
+        guard let defaults = UserDefaults(suiteName: AppConstants.appGroupId) else { return }
+        WidgetData.clear(from: defaults)
+        WidgetCenter.shared.reloadTimelines(ofKind: AppConstants.widgetKind)
     }
 }
 
@@ -188,5 +283,130 @@ private enum UITestOnboardingWindow {
         NSApp.activate(ignoringOtherApps: true)
 
         self.window = window
+    }
+}
+
+@MainActor
+private enum UITestSettingsWindow {
+    private static var window: NSWindow?
+
+    static func show(settingsStore: SettingsStore, storeManager: StoreManager) {
+        let hostingView = NSHostingView(
+            rootView: SettingsView(settingsStore: settingsStore, storeManager: storeManager)
+                .frame(width: 440, height: 380)
+        )
+
+        let window = makeWindow(title: "Settings UI Tests", width: 440, height: 380)
+        window.contentView = hostingView
+        self.window = window
+        present(window)
+    }
+}
+
+@MainActor
+private enum UITestPaywallWindow {
+    private static var window: NSWindow?
+
+    static func show(storeManager: StoreManager) {
+        let hostingView = NSHostingView(
+            rootView: PaywallView(storeManager: storeManager, onDismiss: {})
+                .frame(width: 320, height: 320)
+        )
+
+        let window = makeWindow(title: "Paywall UI Tests", width: 320, height: 320)
+        window.contentView = hostingView
+        self.window = window
+        present(window)
+    }
+}
+
+@MainActor
+private enum UITestDashboardWindow {
+    private static var window: NSWindow?
+
+    static func show(
+        menuBarVM: MenuBarViewModel,
+        dashboardVM: DashboardViewModel,
+        storeManager: StoreManager,
+        settingsStore: SettingsStore
+    ) {
+        let hostingView = NSHostingView(
+            rootView: DashboardView(
+                menuBarVM: menuBarVM,
+                dashboardVM: dashboardVM,
+                storeManager: storeManager,
+                settingsStore: settingsStore,
+                persistence: nil
+            )
+            .frame(width: 380, height: 520)
+        )
+
+        let window = makeWindow(title: "Dashboard UI Tests", width: 380, height: 520)
+        window.contentView = hostingView
+        self.window = window
+        present(window)
+    }
+}
+
+@MainActor
+private func makeWindow(title: String, width: CGFloat, height: CGFloat) -> NSWindow {
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+        styleMask: [.titled, .closable],
+        backing: .buffered,
+        defer: false
+    )
+    window.title = title
+    window.center()
+    window.isReleasedWhenClosed = false
+    return window
+}
+
+@MainActor
+private func present(_ window: NSWindow) {
+    window.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
+}
+
+private struct UITestDashboardMonitoringService: MonitoringServiceProtocol {
+    func fetchStatusPage(connection: ServerConnection) async throws -> StatusPageResult {
+        StatusPageResult(
+            title: connection.name,
+            groups: [
+                UnifiedGroup(
+                    id: "group-\(connection.statusPageSlug)",
+                    name: connection.name,
+                    weight: 0,
+                    monitors: [
+                        UnifiedMonitor(
+                            id: "\(connection.statusPageSlug)-api",
+                            name: "\(connection.name) API",
+                            type: "http",
+                            currentStatus: connection.statusPageSlug == "secondary" ? .down : .up,
+                            latestPing: connection.statusPageSlug == "secondary" ? 180 : 60,
+                            uptime24h: connection.statusPageSlug == "secondary" ? 0.97 : 1.0,
+                            uptime7d: connection.statusPageSlug == "secondary" ? 0.97 : 1.0,
+                            uptime30d: connection.statusPageSlug == "secondary" ? 0.97 : 1.0,
+                            certExpiryDays: nil,
+                            validCert: nil,
+                            url: nil,
+                            lastStatusChange: nil
+                        )
+                    ]
+                )
+            ],
+            heartbeats: [:],
+            incidents: [],
+            maintenances: [],
+            showCertExpiry: false
+        )
+    }
+
+    func fetchHeartbeats(connection: ServerConnection) async throws -> HeartbeatResult {
+        HeartbeatResult(heartbeats: [:], uptimes: [:])
+    }
+
+    func validateConnection(_ connection: ServerConnection) async throws -> Bool {
+        true
     }
 }

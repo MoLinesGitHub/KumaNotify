@@ -11,6 +11,22 @@ struct OnboardingView: View {
     @State private var isTesting = false
     @State private var testResult: TestResult?
 
+    private var normalizedSlug: String {
+        slug.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedServerName: String {
+        ServerConnection.normalizedDisplayName(from: serverName)
+    }
+
+    private var validatedServerURL: URL? {
+        ServerConnection.validatedBaseURL(from: serverURL)
+    }
+
+    private var canContinue: Bool {
+        validatedServerURL != nil && !normalizedSlug.isEmpty
+    }
+
     enum TestResult {
         case success(String)
         case failure(String)
@@ -115,14 +131,14 @@ struct OnboardingView: View {
                 Button("Test Connection") {
                     Task { await testConnection() }
                 }
-                .disabled(serverURL.isEmpty || slug.isEmpty || isTesting)
+                .disabled(!canContinue || isTesting)
                 .accessibilityIdentifier("onboarding.testConnectionButton")
 
                 Button("Next") {
                     saveAndContinue()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(serverURL.isEmpty || slug.isEmpty)
+                .disabled(!canContinue)
                 .accessibilityIdentifier("onboarding.nextButton")
             }
             .padding(.horizontal, 20)
@@ -162,7 +178,7 @@ struct OnboardingView: View {
     // MARK: - Actions
 
     private func testConnection() async {
-        guard let url = URL(string: serverURL) else {
+        guard let url = validatedServerURL else {
             testResult = .failure(String(localized: "Invalid URL"))
             return
         }
@@ -171,9 +187,9 @@ struct OnboardingView: View {
         defer { isTesting = false }
 
         let connection = ServerConnection(
-            name: serverName,
+            name: normalizedServerName,
             baseURL: url,
-            statusPageSlug: slug
+            statusPageSlug: normalizedSlug
         )
 
         let service = UptimeKumaService()
@@ -186,11 +202,11 @@ struct OnboardingView: View {
     }
 
     private func saveAndContinue() {
-        guard let url = URL(string: serverURL) else { return }
+        guard let url = validatedServerURL else { return }
         settingsStore.serverConnection = ServerConnection(
-            name: serverName,
+            name: normalizedServerName,
             baseURL: url,
-            statusPageSlug: slug
+            statusPageSlug: normalizedSlug
         )
         withAnimation { step = 2 }
     }

@@ -2,6 +2,10 @@ import XCTest
 @testable import KumaNotify
 
 final class KumaNotifyTests: XCTestCase {
+    struct FailingTestError: LocalizedError {
+        var errorDescription: String? { "Restore failed" }
+    }
+
     @MainActor
     private func makeSettingsStore() -> (suiteName: String, store: SettingsStore) {
         let suiteName = "KumaNotifyTests.\(UUID().uuidString)"
@@ -45,6 +49,29 @@ final class KumaNotifyTests: XCTestCase {
         }
     }
 
+    actor SequencedMonitoringService: MonitoringServiceProtocol {
+        private var results: [StatusPageResult]
+
+        init(results: [StatusPageResult]) {
+            self.results = results
+        }
+
+        func fetchStatusPage(connection: ServerConnection) async throws -> StatusPageResult {
+            if results.count > 1 {
+                return results.removeFirst()
+            }
+            return results.first!
+        }
+
+        func fetchHeartbeats(connection: ServerConnection) async throws -> HeartbeatResult {
+            HeartbeatResult(heartbeats: [:], uptimes: [:])
+        }
+
+        func validateConnection(_ connection: ServerConnection) async throws -> Bool {
+            true
+        }
+    }
+
     struct ScriptedMonitoringService: MonitoringServiceProtocol {
         let fetchStatusPageHandler: @Sendable (ServerConnection) async throws -> StatusPageResult
         let fetchHeartbeatsHandler: @Sendable (ServerConnection) async throws -> HeartbeatResult
@@ -72,6 +99,44 @@ final class KumaNotifyTests: XCTestCase {
 
         func validateConnection(_ connection: ServerConnection) async throws -> Bool {
             try await validateConnectionHandler(connection)
+        }
+    }
+
+    @MainActor
+    final class NotificationSpy: NotificationManaging {
+        private(set) var downAlerts: [(UUID, String)] = []
+        private(set) var recoveryAlerts: [(UUID, String)] = []
+        private(set) var certExpiryWarnings: [(UUID, String, Int)] = []
+
+        func sendDownAlert(
+            serverConnectionId: UUID,
+            monitorId: String,
+            monitorName: String,
+            serverName: String,
+            soundOption: NotificationSoundOption
+        ) {
+            downAlerts.append((serverConnectionId, monitorId))
+        }
+
+        func sendRecoveryAlert(
+            serverConnectionId: UUID,
+            monitorId: String,
+            monitorName: String,
+            serverName: String,
+            downDuration: TimeInterval?,
+            soundOption: NotificationSoundOption
+        ) {
+            recoveryAlerts.append((serverConnectionId, monitorId))
+        }
+
+        func sendCertExpiryWarning(
+            serverConnectionId: UUID,
+            monitorId: String,
+            monitorName: String,
+            daysRemaining: Int,
+            soundOption: NotificationSoundOption
+        ) {
+            certExpiryWarnings.append((serverConnectionId, monitorId, daysRemaining))
         }
     }
 
@@ -114,6 +179,27 @@ final class KumaNotifyTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsStoreNotificationsDefaultToDisabledUntilAuthorized() {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertFalse(store.notificationsEnabled)
+        XCTAssertEqual(store.notificationAuthorizationStatus, .notDetermined)
+    }
+
+    @MainActor
+    func testSettingsStoreNotificationPreferenceIsIndependentFromAuthorization() {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        store.notificationAuthorizationStatus = .authorized
+        store.notificationsEnabled = false
+
+        XCTAssertFalse(store.notificationsEnabled)
+        XCTAssertEqual(store.notificationAuthorizationStatus, .authorized)
+    }
+
+    @MainActor
     func testSettingsStoreMaintainsDefaultConnectionWhenUpdatingAndRemoving() {
         let (suiteName, store) = makeSettingsStore()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
@@ -141,6 +227,49 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(store.serverConnections.count, 1)
         XCTAssertEqual(store.serverConnection?.id, primary.id)
         XCTAssertTrue(store.serverConnections[0].isDefault)
+    }
+
+    @MainActor
+    func testSettingsStoreServerConnectionSetterKeepsSingleDefault() {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let primary = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let secondary = ServerConnection(
+            name: "Secondary",
+            baseURL: URL(string: "https://secondary.example.com")!,
+            statusPageSlug: "secondary",
+            isDefault: false
+        )
+
+        store.addConnection(primary)
+        store.addConnection(secondary)
+
+        store.serverConnection = ServerConnection(
+            id: secondary.id,
+            name: secondary.name,
+            baseURL: secondary.baseURL,
+            statusPageSlug: secondary.statusPageSlug,
+            isDefault: true
+        )
+
+        XCTAssertEqual(store.serverConnection?.id, secondary.id)
+        XCTAssertEqual(store.serverConnections.filter(\.isDefault).count, 1)
+    }
+
+    func testServerConnectionNormalizedDisplayNameFallsBackForWhitespaceOnlyInput() {
+        XCTAssertEqual(
+            ServerConnection.normalizedDisplayName(from: "   \n\t  "),
+            String(localized: "My Kuma Server")
+        )
+        XCTAssertEqual(
+            ServerConnection.normalizedDisplayName(from: "  Primary  "),
+            "Primary"
+        )
     }
 
     @MainActor
@@ -288,9 +417,10 @@ final class KumaNotifyTests: XCTestCase {
         networkMonitor.isConnected = false
 
         var reloadCount = 0
+        let pollingEngine = PollingEngine()
         let viewModel = MenuBarViewModel(
             settingsStore: store,
-            pollingEngine: PollingEngine(),
+            pollingEngine: pollingEngine,
             networkMonitor: networkMonitor,
             widgetDefaults: widgetDefaults,
             reloadWidgets: { reloadCount += 1 },
@@ -304,7 +434,98 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(widgetData?.overallStatusRaw, "unreachable")
         XCTAssertEqual(widgetData?.upCount, 0)
         XCTAssertEqual(widgetData?.totalCount, 0)
+        XCTAssertEqual(pollingEngine.consecutiveFailures, 1)
+        XCTAssertEqual(pollingEngine.effectiveInterval, AppConstants.defaultPollingInterval * 2)
         XCTAssertEqual(reloadCount, 1)
+    }
+
+    @MainActor
+    func testMenuBarViewModelRefreshesNotificationAuthorizationStatusDuringPolling() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+        store.notificationAuthorizationStatus = .denied
+
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = false
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            networkMonitor: networkMonitor,
+            notificationAuthorizationStatusProvider: { .authorized },
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+
+        XCTAssertEqual(store.notificationAuthorizationStatus, .authorized)
+    }
+
+    @MainActor
+    func testMenuBarViewModelClearsConnectionSnapshotsWhenNetworkGoesOffline() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        let monitor = UnifiedMonitor(
+            id: "api",
+            name: "API",
+            type: "http",
+            currentStatus: .up,
+            latestPing: 90,
+            uptime24h: 1,
+            uptime7d: 1,
+            uptime30d: 1,
+            certExpiryDays: nil,
+            validCert: nil,
+            url: nil,
+            lastStatusChange: nil
+        )
+        let result = StatusPageResult(
+            title: "Primary",
+            groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: [monitor])],
+            heartbeats: [:],
+            incidents: [],
+            maintenances: [],
+            showCertExpiry: false
+        )
+        let service = ScriptedMonitoringService { _ in result }
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+        XCTAssertNotNil(viewModel.statusPageResult(for: connection.id))
+
+        networkMonitor.isConnected = false
+        await viewModel.refresh()
+
+        XCTAssertNil(viewModel.statusPageResult(for: connection.id))
+        XCTAssertEqual(
+            viewModel.connectionErrorMessage(for: connection.id),
+            String(localized: "No network connection")
+        )
     }
 
     @MainActor
@@ -386,6 +607,317 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertEqual(widgetData?.overallStatusRaw, "unreachable")
     }
 
+    @MainActor
+    func testMenuBarViewModelTreatsEmptySuccessfulStatusPageAsNoData() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+
+        let service = ScriptedMonitoringService { _ in
+            StatusPageResult(
+                title: "Primary",
+                groups: [],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: false
+            )
+        }
+
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertEqual(viewModel.totalCount, 0)
+        if case .unreachable = viewModel.overallStatus {
+            XCTAssertTrue(true)
+        } else {
+            XCTFail("Expected empty successful status pages to surface as no data")
+        }
+    }
+
+    @MainActor
+    func testMenuBarViewModelTracksTransitionsWhenNotificationsAreDisabled() async throws {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+        store.notificationsEnabled = false
+        store.acknowledgeMonitor(connectionId: connection.id, monitorId: "api")
+
+        let persistence = try PersistenceManager(isStoredInMemoryOnly: true)
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        func makeResult(status: MonitorStatus) -> StatusPageResult {
+            let monitor = UnifiedMonitor(
+                id: "api",
+                name: "API",
+                type: "http",
+                currentStatus: status,
+                latestPing: 90,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: nil,
+                validCert: nil,
+                url: nil,
+                lastStatusChange: nil
+            )
+            return StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: [monitor])],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: false
+            )
+        }
+
+        let service = SequencedMonitoringService(results: [
+            makeResult(status: .up),
+            makeResult(status: .down),
+            makeResult(status: .up),
+        ])
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            persistence: persistence,
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+        await viewModel.refresh()
+        await viewModel.refresh()
+
+        let incidents = persistence.fetchRecentIncidents(serverConnectionId: connection.id, limit: 10)
+        XCTAssertEqual(incidents.count, 2)
+        XCTAssertEqual(incidents.map(\.transitionType), [.recovered, .wentDown])
+        XCTAssertFalse(store.isMonitorAcknowledged(connectionId: connection.id, monitorId: "api"))
+    }
+
+    @MainActor
+    func testMenuBarViewModelSendsCertExpiryWarningsWithoutDuplicatingSameDayCount() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+        store.notificationsEnabled = true
+        store.notificationAuthorizationStatus = .authorized
+
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        func makeResult(daysRemaining: Int) -> StatusPageResult {
+            let monitor = UnifiedMonitor(
+                id: "api",
+                name: "API",
+                type: "http",
+                currentStatus: .up,
+                latestPing: 90,
+                uptime24h: 1,
+                uptime7d: 1,
+                uptime30d: 1,
+                certExpiryDays: daysRemaining,
+                validCert: true,
+                url: nil,
+                lastStatusChange: nil
+            )
+            return StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: [monitor])],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: true
+            )
+        }
+
+        let service = SequencedMonitoringService(results: [
+            makeResult(daysRemaining: 7),
+            makeResult(daysRemaining: 7),
+            makeResult(daysRemaining: 6),
+        ])
+        let notifications = NotificationSpy()
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            notifications: notifications,
+            notificationAuthorizationStatusProvider: { .authorized },
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+        await viewModel.refresh()
+        await viewModel.refresh()
+
+        XCTAssertEqual(notifications.certExpiryWarnings.count, 2)
+        XCTAssertEqual(notifications.certExpiryWarnings[0].0, connection.id)
+        XCTAssertEqual(notifications.certExpiryWarnings[0].1, "api")
+        XCTAssertEqual(notifications.certExpiryWarnings[0].2, 7)
+        XCTAssertEqual(notifications.certExpiryWarnings[1].0, connection.id)
+        XCTAssertEqual(notifications.certExpiryWarnings[1].1, "api")
+        XCTAssertEqual(notifications.certExpiryWarnings[1].2, 6)
+    }
+
+    @MainActor
+    func testMenuBarViewModelPrunesMissingMonitorStateBeforeLaterRecovery() async throws {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+        store.notificationsEnabled = false
+
+        let persistence = try PersistenceManager(isStoredInMemoryOnly: true)
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        func makeResult(monitors: [UnifiedMonitor]) -> StatusPageResult {
+            StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: monitors)],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: false
+            )
+        }
+
+        let upMonitor = UnifiedMonitor(
+            id: "api",
+            name: "API",
+            type: "http",
+            currentStatus: .up,
+            latestPing: 90,
+            uptime24h: 1,
+            uptime7d: 1,
+            uptime30d: 1,
+            certExpiryDays: nil,
+            validCert: nil,
+            url: nil,
+            lastStatusChange: nil
+        )
+        let downMonitor = UnifiedMonitor(
+            id: "api",
+            name: "API",
+            type: "http",
+            currentStatus: .down,
+            latestPing: 90,
+            uptime24h: 1,
+            uptime7d: 1,
+            uptime30d: 1,
+            certExpiryDays: nil,
+            validCert: nil,
+            url: nil,
+            lastStatusChange: nil
+        )
+
+        let service = SequencedMonitoringService(results: [
+            makeResult(monitors: [upMonitor]),
+            makeResult(monitors: [downMonitor]),
+            makeResult(monitors: []),
+            makeResult(monitors: [upMonitor]),
+        ])
+
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            persistence: persistence,
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+        await viewModel.refresh()
+        await viewModel.refresh()
+        await viewModel.refresh()
+
+        let incidents = persistence.fetchRecentIncidents(serverConnectionId: connection.id, limit: 10)
+        XCTAssertEqual(incidents.count, 1)
+        XCTAssertEqual(incidents.first?.transitionType, .wentDown)
+    }
+
+    @MainActor
+    func testStoreManagerEntitlementStateMarksRestoredPurchaseAsPurchased() {
+        let storeManager = StoreManager(startListeningForTransactions: false, autoRefresh: false)
+
+        storeManager.applyEntitlementState(isEntitled: true)
+        XCTAssertTrue(storeManager.proUnlocked)
+        XCTAssertEqual(storeManager.purchaseState, .purchased)
+
+        storeManager.applyEntitlementState(isEntitled: false)
+        XCTAssertFalse(storeManager.proUnlocked)
+        XCTAssertEqual(storeManager.purchaseState, .idle)
+    }
+
+    @MainActor
+    func testStoreManagerRestoreFailuresSurfacePurchaseError() async {
+        let storeManager = StoreManager(
+            syncAppStore: { throw FailingTestError() },
+            startListeningForTransactions: false,
+            autoRefresh: false
+        )
+
+        await storeManager.restorePurchases()
+
+        guard case .failed(let message) = storeManager.purchaseState else {
+            return XCTFail("Expected restore failures to be surfaced in purchaseState")
+        }
+        XCTAssertEqual(message, "Restore failed")
+    }
+
+    @MainActor
+    func testStoreManagerProductLoadFailuresSurfacePaywallError() async {
+        let storeManager = StoreManager(
+            fetchProducts: { _ in throw FailingTestError() },
+            startListeningForTransactions: false,
+            autoRefresh: false
+        )
+
+        await storeManager.refreshStatus()
+
+        XCTAssertNil(storeManager.proProduct)
+        XCTAssertEqual(storeManager.productLoadErrorMessage, "Restore failed")
+    }
+
     func testIntentStatusFormatterBuildsLocalizedSummaries() {
         let data = WidgetData(
             upCount: 3,
@@ -398,13 +930,32 @@ final class KumaNotifyTests: XCTestCase {
         )
 
         let statusSummary = IntentStatusFormatter.statusSummary(for: data)
-        XCTAssertTrue(statusSummary.value.contains("3/5"))
+        XCTAssertTrue(statusSummary.value.contains(WidgetData.monitorSummaryLine(upCount: 3, totalCount: 5)))
         XCTAssertTrue(statusSummary.value.contains("2"))
+        XCTAssertFalse(statusSummary.value.contains("OK"))
 
         let monitorCounts = IntentStatusFormatter.monitorCountSummary(for: data)
         XCTAssertTrue(monitorCounts.contains("3"))
         XCTAssertTrue(monitorCounts.contains("2"))
         XCTAssertTrue(monitorCounts.contains("5"))
+    }
+
+    func testIntentStatusFormatterOmitsCountsWhenStatusIsUnreachable() {
+        let data = WidgetData(
+            upCount: 5,
+            totalCount: 5,
+            downCount: 0,
+            overallStatusRaw: "unreachable",
+            lastCheckTime: nil,
+            serverName: nil,
+            hasActiveIncident: true
+        )
+
+        let statusSummary = IntentStatusFormatter.statusSummary(for: data)
+        XCTAssertEqual(statusSummary.value, OverallStatus.unreachable.label)
+
+        let monitorCounts = IntentStatusFormatter.monitorCountSummary(for: data)
+        XCTAssertEqual(monitorCounts, OverallStatus.unreachable.label)
     }
 
     func testLocalizableCatalogContainsSystemSurfaceMetadata() throws {
@@ -419,7 +970,14 @@ final class KumaNotifyTests: XCTestCase {
             "Check %@ status",
             "How are my monitors in %@?",
             "Are my servers up in %@?",
-            "Monitor your services at a glance."
+            "Monitor your services at a glance.",
+            "Notifications Disabled in System Settings",
+            "Notifications are currently blocked by System Settings.",
+            "Allow notifications for Kuma Notify in System Settings, then enable them again here.",
+            "Open System Settings",
+            "Retry",
+            "%lld up / %lld total",
+            "%@ — %@"
         ].forEach { key in
             XCTAssertTrue(contents.contains("\"\(key)\""), "Missing localization key: \(key)")
         }
@@ -565,6 +1123,71 @@ final class KumaNotifyTests: XCTestCase {
     }
 
     @MainActor
+    func testDashboardViewModelComputesConnectionScopedOverallStatus() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let service = ScriptedMonitoringService { _ in
+            let monitors = [
+                UnifiedMonitor(
+                    id: "api",
+                    name: "API",
+                    type: "http",
+                    currentStatus: .up,
+                    latestPing: 120,
+                    uptime24h: 1,
+                    uptime7d: 1,
+                    uptime30d: 1,
+                    certExpiryDays: nil,
+                    validCert: nil,
+                    url: nil,
+                    lastStatusChange: nil
+                ),
+                UnifiedMonitor(
+                    id: "worker",
+                    name: "Worker",
+                    type: "http",
+                    currentStatus: .down,
+                    latestPing: 70,
+                    uptime24h: 0.94,
+                    uptime7d: 0.94,
+                    uptime30d: 0.94,
+                    certExpiryDays: nil,
+                    validCert: nil,
+                    url: nil,
+                    lastStatusChange: nil
+                )
+            ]
+            return StatusPageResult(
+                title: "Primary",
+                groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: monitors)],
+                heartbeats: [:],
+                incidents: [],
+                maintenances: [],
+                showCertExpiry: false
+            )
+        }
+        let viewModel = DashboardViewModel(
+            connection: connection,
+            settingsStore: store,
+            serviceFactory: { _ in service }
+        )
+
+        await viewModel.fetchData()
+
+        guard case .someDown(let count, let total) = viewModel.overallStatus else {
+            return XCTFail("Expected connection-scoped status to reflect selected server monitors")
+        }
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(total, 2)
+    }
+
+    @MainActor
     func testDashboardViewModelClearsStaleDataWhenRefreshFails() async {
         let (suiteName, store) = makeSettingsStore()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
@@ -619,6 +1242,16 @@ final class KumaNotifyTests: XCTestCase {
             )
         ]
         viewModel.maintenances = [UnifiedMaintenance(id: "m1", title: "Maintenance", description: nil, startDate: nil, endDate: nil)]
+        viewModel.incidentRecords = [
+            IncidentRecord(
+                monitorId: "api",
+                monitorName: "API",
+                serverConnectionId: connection.id,
+                serverName: "Primary",
+                transitionType: .wentDown
+            )
+        ]
+        viewModel.lastIncidentDate = Date()
 
         await viewModel.fetchData()
 
@@ -626,10 +1259,165 @@ final class KumaNotifyTests: XCTestCase {
         XCTAssertTrue(viewModel.heartbeats.isEmpty)
         XCTAssertTrue(viewModel.incidents.isEmpty)
         XCTAssertTrue(viewModel.maintenances.isEmpty)
+        XCTAssertTrue(viewModel.incidentRecords.isEmpty)
+        XCTAssertNil(viewModel.lastIncidentDate)
         XCTAssertEqual(viewModel.summaryText, String(localized: "No data"))
         XCTAssertEqual(viewModel.errorMessage, String(localized: "Server unreachable"))
     }
 
+    @MainActor
+    func testDashboardViewModelClearsIncidentMetadataWhenSwitchingConnection() {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let primary = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let secondary = ServerConnection(
+            name: "Secondary",
+            baseURL: URL(string: "https://secondary.example.com")!,
+            statusPageSlug: "secondary",
+            isDefault: false
+        )
+        let viewModel = DashboardViewModel(connection: primary, settingsStore: store)
+        viewModel.incidentRecords = [
+            IncidentRecord(
+                monitorId: "api",
+                monitorName: "API",
+                serverConnectionId: primary.id,
+                serverName: "Primary",
+                transitionType: .wentDown
+            )
+        ]
+        viewModel.lastIncidentDate = Date()
+
+        viewModel.switchConnection(secondary)
+
+        XCTAssertTrue(viewModel.incidentRecords.isEmpty)
+        XCTAssertNil(viewModel.lastIncidentDate)
+    }
+
+    func testWidgetDataClearRemovesPersistedSnapshot() {
+        let suiteName = "KumaNotifyTests.widget.clear.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        WidgetData(
+            upCount: 1,
+            totalCount: 1,
+            downCount: 0,
+            overallStatusRaw: "allUp",
+            lastCheckTime: Date(),
+            serverName: "Primary",
+            hasActiveIncident: false
+        ).write(to: defaults)
+
+        WidgetData.clear(from: defaults)
+
+        XCTAssertNil(WidgetData.read(from: defaults))
+    }
+
+    func testWidgetReloadSignatureStaysStableWithinFreshnessBucket() {
+        let baseline = Date(timeIntervalSince1970: 1_000)
+        let newerSameBucket = Date(timeIntervalSince1970: 1_000 + 60)
+
+        let first = WidgetData(
+            upCount: 1,
+            totalCount: 1,
+            downCount: 0,
+            overallStatusRaw: "allUp",
+            lastCheckTime: baseline,
+            serverName: "Primary",
+            hasActiveIncident: false
+        )
+        let second = WidgetData(
+            upCount: 1,
+            totalCount: 1,
+            downCount: 0,
+            overallStatusRaw: "allUp",
+            lastCheckTime: newerSameBucket,
+            serverName: "Primary",
+            hasActiveIncident: false
+        )
+
+        XCTAssertEqual(first.reloadSignature, second.reloadSignature)
+    }
+
+    func testWidgetReloadSignatureChangesAcrossFreshnessBuckets() {
+        let baseline = Date(timeIntervalSince1970: 1_000)
+        let nextBucket = Date(timeIntervalSince1970: 1_000 + WidgetData.freshnessReloadInterval + 1)
+
+        let first = WidgetData(
+            upCount: 1,
+            totalCount: 1,
+            downCount: 0,
+            overallStatusRaw: "allUp",
+            lastCheckTime: baseline,
+            serverName: "Primary",
+            hasActiveIncident: false
+        )
+        let second = WidgetData(
+            upCount: 1,
+            totalCount: 1,
+            downCount: 0,
+            overallStatusRaw: "allUp",
+            lastCheckTime: nextBucket,
+            serverName: "Primary",
+            hasActiveIncident: false
+        )
+
+        XCTAssertNotEqual(first.reloadSignature, second.reloadSignature)
+    }
+
+    func testUptimeKumaMapperParsesHeartbeatAndMaintenanceDates() {
+        let mapper = UptimeKumaMapper()
+        let heartbeatResult = mapper.mapHeartbeats(UKHeartbeatResponse(
+            heartbeatList: [
+                "1": [UKHeartbeat(status: 1, time: "2026-03-27 10:30:00", msg: "OK", ping: 42)]
+            ],
+            uptimeList: ["1_24": 0.99]
+        ))
+        let statusResult = mapper.mapStatusPage(
+            UKStatusPageResponse(
+                config: UKConfig(
+                    slug: "primary",
+                    title: "Primary",
+                    description: nil,
+                    icon: nil,
+                    autoRefreshInterval: nil,
+                    theme: nil,
+                    published: true,
+                    showTags: false,
+                    showCertificateExpiry: false,
+                    showOnlyLastHeartbeat: false,
+                    footerText: nil,
+                    showPoweredBy: true
+                ),
+                incidents: [],
+                publicGroupList: [],
+                maintenanceList: [
+                    UKMaintenance(
+                        id: 1,
+                        title: "Window",
+                        description: nil,
+                        start: "2026-03-27 12:00:00",
+                        end: "2026-03-27 13:00:00"
+                    )
+                ]
+            ),
+            heartbeatResult: heartbeatResult
+        )
+
+        XCTAssertEqual(heartbeatResult.heartbeats["1"]?.first?.ping, 42)
+        XCTAssertNotNil(heartbeatResult.heartbeats["1"]?.first?.time)
+        XCTAssertNotNil(statusResult.maintenances.first?.startDate)
+        XCTAssertNotNil(statusResult.maintenances.first?.endDate)
+    }
+
+    @MainActor
     func testNotificationIdentifiersAreNamespacedByServerConnection() {
         let primaryID = UUID()
         let secondaryID = UUID()
@@ -646,6 +1434,74 @@ final class KumaNotifyTests: XCTestCase {
             NotificationManager.certExpiryIdentifier(serverConnectionId: primaryID, monitorId: "api", daysRemaining: 7),
             NotificationManager.certExpiryIdentifier(serverConnectionId: secondaryID, monitorId: "api", daysRemaining: 7)
         )
+    }
+
+    @MainActor
+    func testDashboardViewModelIgnoresStaleResultsForPreviousConnection() {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let primary = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let secondary = ServerConnection(
+            name: "Secondary",
+            baseURL: URL(string: "https://secondary.example.com")!,
+            statusPageSlug: "secondary",
+            isDefault: false
+        )
+        let viewModel = DashboardViewModel(connection: primary, settingsStore: store)
+        let staleResult = StatusPageResult(
+            title: "Primary",
+            groups: [
+                UnifiedGroup(
+                    id: "g1",
+                    name: "Core",
+                    weight: 0,
+                    monitors: [
+                        UnifiedMonitor(
+                            id: "api",
+                            name: "API",
+                            type: "http",
+                            currentStatus: .down,
+                            latestPing: 120,
+                            uptime24h: 1,
+                            uptime7d: 1,
+                            uptime30d: 1,
+                            certExpiryDays: nil,
+                            validCert: nil,
+                            url: nil,
+                            lastStatusChange: nil
+                        )
+                    ]
+                )
+            ],
+            heartbeats: [:],
+            incidents: [],
+            maintenances: [],
+            showCertExpiry: false
+        )
+
+        viewModel.switchConnection(secondary)
+        viewModel.applyStatusPageResult(staleResult, for: primary.id)
+
+        XCTAssertEqual(viewModel.connection.id, secondary.id)
+        XCTAssertTrue(viewModel.groups.isEmpty)
+        XCTAssertEqual(viewModel.summaryText, String(localized: "No data"))
+    }
+
+    func testHTTPClientPrioritizesPrivateRelayErrorsOverGenericConnectivity() {
+        let failingURL = URL(string: "https://mask.icloud.com")!
+        let error = URLError(
+            .cannotConnectToHost,
+            userInfo: [NSURLErrorFailingURLErrorKey: failingURL]
+        )
+
+        guard case .privateRelayBlocked? = HTTPClient.apiError(for: error) else {
+            return XCTFail("Expected Private Relay mapping to win over generic connectivity errors")
+        }
     }
 
     @MainActor
@@ -707,5 +1563,100 @@ final class KumaNotifyTests: XCTestCase {
         )
         viewModel.monitorPreferences = [pref.compositeKey: pref]
         XCTAssertTrue(viewModel.filteredGroups.isEmpty)
+    }
+
+    @MainActor
+    func testDashboardViewModelUsesNeutralSummaryText() {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        let viewModel = DashboardViewModel(connection: connection, settingsStore: store)
+
+        viewModel.groups = [
+            UnifiedGroup(
+                id: "g1",
+                name: "Core",
+                weight: 0,
+                monitors: [
+                    UnifiedMonitor(
+                        id: "api",
+                        name: "API",
+                        type: "http",
+                        currentStatus: .down,
+                        latestPing: 120,
+                        uptime24h: 1,
+                        uptime7d: 1,
+                        uptime30d: 1,
+                        certExpiryDays: nil,
+                        validCert: nil,
+                        url: nil,
+                        lastStatusChange: nil
+                    )
+                ]
+            )
+        ]
+
+        XCTAssertTrue(viewModel.summaryText.contains(WidgetData.monitorSummaryLine(upCount: 0, totalCount: 1)))
+        XCTAssertFalse(viewModel.summaryText.contains("OK"))
+    }
+
+    @MainActor
+    func testMenuBarViewModelOnlyReloadsWidgetsWhenVisibleSnapshotChanges() async {
+        let (suiteName, store) = makeSettingsStore()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        let connection = ServerConnection(
+            name: "Primary",
+            baseURL: URL(string: "https://primary.example.com")!,
+            statusPageSlug: "primary"
+        )
+        store.addConnection(connection)
+
+        let networkMonitor = NetworkMonitor()
+        networkMonitor.isConnected = true
+
+        let monitor = UnifiedMonitor(
+            id: "api",
+            name: "API",
+            type: "http",
+            currentStatus: .up,
+            latestPing: 90,
+            uptime24h: 1,
+            uptime7d: 1,
+            uptime30d: 1,
+            certExpiryDays: nil,
+            validCert: nil,
+            url: nil,
+            lastStatusChange: nil
+        )
+        let result = StatusPageResult(
+            title: "Primary",
+            groups: [UnifiedGroup(id: "g1", name: "Core", weight: 0, monitors: [monitor])],
+            heartbeats: [:],
+            incidents: [],
+            maintenances: [],
+            showCertExpiry: false
+        )
+        let service = ScriptedMonitoringService { _ in result }
+
+        var reloadCount = 0
+        let viewModel = MenuBarViewModel(
+            settingsStore: store,
+            pollingEngine: PollingEngine(),
+            serviceFactory: { _ in service },
+            networkMonitor: networkMonitor,
+            reloadWidgets: { reloadCount += 1 },
+            shouldStartMonitors: false
+        )
+
+        await viewModel.refresh()
+        await viewModel.refresh()
+
+        XCTAssertEqual(reloadCount, 1)
     }
 }

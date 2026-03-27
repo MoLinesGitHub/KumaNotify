@@ -63,9 +63,11 @@ struct KumaNotifyWidgetEntryView: View {
                     .lineLimit(1)
             }
 
-            Text("\(data.upCount)/\(data.totalCount) OK")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+            if data.overallStatusRaw != "unreachable" {
+                Text(data.monitorSummaryLine)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
 
             if let serverName = data.serverName {
                 Text(serverName)

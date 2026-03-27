@@ -15,9 +15,12 @@ final class StoreManager {
     }
     #endif
     private(set) var proProduct: Product?
+    private(set) var productLoadErrorMessage: String?
     private(set) var purchaseState: PurchaseState = .idle
 
     private var transactionListener: Task<Void, Never>?
+    private let fetchProducts: @Sendable ([String]) async throws -> [Product]
+    private let syncAppStore: @Sendable () async throws -> Void
 
     enum PurchaseState: Equatable {
         case idle
@@ -26,9 +29,24 @@ final class StoreManager {
         case failed(String)
     }
 
-    init() {
-        transactionListener = listenForTransactions()
-        Task { await refreshStatus() }
+    init(
+        fetchProducts: @escaping @Sendable ([String]) async throws -> [Product] = { ids in
+            try await Product.products(for: ids)
+        },
+        syncAppStore: @escaping @Sendable () async throws -> Void = {
+            try await AppStore.sync()
+        },
+        startListeningForTransactions: Bool = true,
+        autoRefresh: Bool = true
+    ) {
+        self.fetchProducts = fetchProducts
+        self.syncAppStore = syncAppStore
+        if startListeningForTransactions {
+            transactionListener = listenForTransactions()
+        }
+        if autoRefresh {
+            Task { await refreshStatus() }
+        }
     }
 
     // MARK: - Public
@@ -48,8 +66,7 @@ final class StoreManager {
                 switch verification {
                 case .verified(let transaction):
                     await transaction.finish()
-                    proUnlocked = true
-                    purchaseState = .purchased
+                    applyEntitlementState(isEntitled: true)
                 case .unverified(let transaction, let error):
                     await transaction.finish()
                     Logger.app.error("Unverified transaction: \(error.localizedDescription)")
@@ -70,18 +87,26 @@ final class StoreManager {
     }
 
     func restorePurchases() async {
-        try? await AppStore.sync()
-        await updateEntitlement()
+        do {
+            try await syncAppStore()
+            await updateEntitlement()
+        } catch {
+            Logger.app.error("Restore purchases failed: \(error.localizedDescription)")
+            purchaseState = .failed(error.localizedDescription)
+        }
     }
 
     // MARK: - Private
 
     private func loadProduct() async {
         do {
-            let products = try await Product.products(for: [AppConstants.proProductId])
+            let products = try await fetchProducts([AppConstants.proProductId])
             proProduct = products.first
+            productLoadErrorMessage = nil
         } catch {
             Logger.app.error("Failed to load products: \(error.localizedDescription)")
+            proProduct = nil
+            productLoadErrorMessage = error.localizedDescription
         }
     }
 
@@ -97,7 +122,16 @@ final class StoreManager {
                 Logger.app.warning("Unverified entitlement for \(transaction.productID): \(error.localizedDescription)")
             }
         }
-        proUnlocked = found
+        applyEntitlementState(isEntitled: found)
+    }
+
+    func applyEntitlementState(isEntitled: Bool) {
+        proUnlocked = isEntitled
+        if isEntitled {
+            purchaseState = .purchased
+        } else if purchaseState == .purchased {
+            purchaseState = .idle
+        }
     }
 
     private func listenForTransactions() -> Task<Void, Never> {
@@ -108,9 +142,9 @@ final class StoreManager {
                     await transaction.finish()
                     if transaction.productID == AppConstants.proProductId {
                         if transaction.revocationDate != nil {
-                            self?.proUnlocked = false
+                            self?.applyEntitlementState(isEntitled: false)
                         } else {
-                            self?.proUnlocked = true
+                            self?.applyEntitlementState(isEntitled: true)
                         }
                     }
                 case .unverified(let transaction, let error):

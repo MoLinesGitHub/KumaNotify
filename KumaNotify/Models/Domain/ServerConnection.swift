@@ -31,4 +31,27 @@ struct ServerConnection: Codable, Identifiable, Sendable, Hashable {
         self.statusPageSlug = statusPageSlug
         self.isDefault = isDefault
     }
+
+    static func normalizedDisplayName(from rawValue: String) -> String {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return String(localized: "My Kuma Server")
+        }
+        return trimmed
+    }
+
+    static func validatedBaseURL(from rawValue: String) -> URL? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let components = URLComponents(string: trimmed),
+              let scheme = components.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              let host = components.host,
+              !host.isEmpty
+        else {
+            return nil
+        }
+
+        return components.url
+    }
 }

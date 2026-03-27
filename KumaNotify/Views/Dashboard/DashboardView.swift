@@ -39,7 +39,12 @@ struct DashboardView: View {
         .frame(width: 380)
         .frame(minHeight: 400, maxHeight: 700)
         .task {
-            await dashboardVM.fetchData()
+            await syncDashboardFromMenuBar()
+        }
+        .onChange(of: menuBarVM.lastCheckTime) { _, _ in
+            Task {
+                await syncDashboardFromMenuBar()
+            }
         }
         .onChange(of: storeManager.proUnlocked) {
             if storeManager.proUnlocked { showPaywall = false }
@@ -57,7 +62,7 @@ struct DashboardView: View {
             SummaryHeaderView(
                 summary: dashboardVM.summaryText,
                 latency: dashboardVM.serverLatency,
-                overallStatus: menuBarVM.overallStatus,
+                overallStatus: dashboardVM.overallStatus,
                 lastIncidentDate: dashboardVM.lastIncidentDate
             )
 
@@ -135,6 +140,7 @@ struct DashboardView: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("dashboard.serverPicker")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -172,7 +178,28 @@ struct DashboardView: View {
     private func switchServer(to id: UUID) {
         guard let conn = connections.first(where: { $0.id == id }) else { return }
         dashboardVM.switchConnection(conn)
-        Task { await dashboardVM.fetchData() }
+        Task { await syncDashboardFromMenuBar(forceRefresh: false) }
+    }
+
+    private func syncDashboardFromMenuBar(forceRefresh: Bool = false) async {
+        let connectionId = dashboardVM.connection.id
+        let needsRefresh = forceRefresh
+            || (menuBarVM.statusPageResult(for: connectionId) == nil
+                && menuBarVM.connectionErrorMessage(for: connectionId) == nil)
+
+        if needsRefresh {
+            await menuBarVM.refresh()
+        }
+
+        guard dashboardVM.connection.id == connectionId else { return }
+
+        if let result = menuBarVM.statusPageResult(for: connectionId) {
+            dashboardVM.applyStatusPageResult(result, for: connectionId)
+        } else if let error = menuBarVM.connectionErrorMessage(for: connectionId) {
+            dashboardVM.applyErrorState(error, for: connectionId)
+        } else {
+            await dashboardVM.fetchData()
+        }
     }
 
     // MARK: - Bottom Toolbar
@@ -186,8 +213,7 @@ struct DashboardView: View {
         HStack(spacing: 12) {
             toolbarIcon("arrow.clockwise", label: String(localized: "Refresh")) {
                 Task {
-                    await dashboardVM.refresh()
-                    await menuBarVM.refresh()
+                    await syncDashboardFromMenuBar(forceRefresh: true)
                 }
             }
             .accessibilityIdentifier("dashboard.refreshButton")
@@ -261,7 +287,7 @@ struct DashboardView: View {
     #if DEBUG
     private var debugProToggle: some View {
         HStack(spacing: 6) {
-            Text("Free")
+            Text(String(localized: "Free"))
                 .font(.caption2)
                 .foregroundStyle(isPro ? .secondary : .primary)
             Toggle("", isOn: Binding(
@@ -271,7 +297,7 @@ struct DashboardView: View {
             .toggleStyle(.switch)
             .controlSize(.mini)
             .labelsHidden()
-            Text("Pro")
+            Text(String(localized: "Pro"))
                 .font(.caption2)
                 .foregroundStyle(isPro ? .yellow : .secondary)
         }

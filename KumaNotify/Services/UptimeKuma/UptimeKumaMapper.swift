@@ -1,14 +1,6 @@
 import Foundation
 
 struct UptimeKumaMapper: Sendable {
-
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f
-    }()
-
     func mapStatusPage(
         _ response: UKStatusPageResponse,
         heartbeatResult: HeartbeatResult?
@@ -31,8 +23,8 @@ struct UptimeKumaMapper: Sendable {
                 id: String(m.id ?? 0),
                 title: m.title ?? String(localized: "Scheduled Maintenance"),
                 description: m.description,
-                startDate: m.start.flatMap { Self.dateFormatter.date(from: $0) },
-                endDate: m.end.flatMap { Self.dateFormatter.date(from: $0) }
+                startDate: m.start.flatMap(parseTimestamp(_:)),
+                endDate: m.end.flatMap(parseTimestamp(_:))
             )
         }
 
@@ -53,7 +45,7 @@ struct UptimeKumaMapper: Sendable {
             heartbeats[monitorId] = beats.map { beat in
                 UnifiedHeartbeat(
                     status: MonitorStatus(rawValue: beat.status) ?? .pending,
-                    time: Self.dateFormatter.date(from: beat.time) ?? Date(),
+                    time: parseTimestamp(beat.time) ?? Date(),
                     message: beat.msg,
                     ping: beat.ping
                 )
@@ -88,5 +80,13 @@ struct UptimeKumaMapper: Sendable {
             url: nil,
             lastStatusChange: nil
         )
+    }
+
+    private func parseTimestamp(_ value: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: value)
     }
 }

@@ -38,6 +38,7 @@ struct MonitorGroupSection: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("dashboard.monitor.\(monitor.id)")
                 }
             }
             .padding(.horizontal, 6)

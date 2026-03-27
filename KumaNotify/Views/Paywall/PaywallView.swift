@@ -4,6 +4,14 @@ struct PaywallView: View {
     let storeManager: StoreManager
     var onDismiss: (() -> Void)?
 
+    private var isPurchased: Bool {
+        #if DEBUG
+        storeManager.effectiveProUnlocked || storeManager.purchaseState == .purchased
+        #else
+        storeManager.proUnlocked || storeManager.purchaseState == .purchased
+        #endif
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             header
@@ -51,22 +59,39 @@ struct PaywallView: View {
 
     private var purchaseButton: some View {
         Group {
-            switch storeManager.purchaseState {
-            case .purchasing:
-                ProgressView()
-                    .controlSize(.small)
-            case .purchased:
+            if isPurchased {
                 Label("Purchased", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-            case .failed(let message):
+                    .accessibilityIdentifier("paywall.purchasedLabel")
+            } else if let message = storeManager.productLoadErrorMessage,
+                      storeManager.proProduct == nil {
                 VStack(spacing: 4) {
                     Text(message)
                         .font(.caption)
                         .foregroundStyle(.red)
+                    Button("Retry") {
+                        Task { await storeManager.refreshStatus() }
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                }
+            } else {
+                switch storeManager.purchaseState {
+                case .purchasing:
+                    ProgressView()
+                        .controlSize(.small)
+                case .purchased:
+                    EmptyView()
+                case .failed(let message):
+                    VStack(spacing: 4) {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        upgradeButton
+                    }
+                case .idle:
                     upgradeButton
                 }
-            case .idle:
-                upgradeButton
             }
         }
     }
@@ -81,6 +106,7 @@ struct PaywallView: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .disabled(storeManager.proProduct == nil)
+        .accessibilityIdentifier("paywall.upgradeButton")
     }
 
     private var footerButtons: some View {
@@ -90,6 +116,7 @@ struct PaywallView: View {
             }
             .buttonStyle(.link)
             .font(.caption)
+            .accessibilityIdentifier("paywall.restoreButton")
 
             Spacer()
 
@@ -97,6 +124,7 @@ struct PaywallView: View {
                 Button("Not Now") { onDismiss() }
                     .buttonStyle(.link)
                     .font(.caption)
+                    .accessibilityIdentifier("paywall.dismissButton")
             }
         }
     }

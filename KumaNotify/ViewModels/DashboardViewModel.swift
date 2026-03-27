@@ -40,6 +40,7 @@ final class DashboardViewModel {
     private(set) var summaryText = ""
     private(set) var serverLatency: Int?
     private(set) var filteredGroups: [UnifiedGroup] = []
+    private(set) var overallStatus: OverallStatus = .unreachable
 
     private var lastFetchTime: Date? {
         didSet { recomputeSummary() }
@@ -65,23 +66,9 @@ final class DashboardViewModel {
 
         do {
             let result = try await service.fetchStatusPage(connection: connection)
-            groups = result.groups
-            heartbeats = result.heartbeats
-            incidents = result.incidents
-            maintenances = result.maintenances
-
-            lastFetchTime = Date()
-            errorMessage = nil
-
-            loadPreferences()
-            loadLastIncidentDate()
+            applyStatusPageResult(result)
         } catch {
-            groups = []
-            heartbeats = [:]
-            incidents = []
-            maintenances = []
-            lastFetchTime = nil
-            errorMessage = error.localizedDescription
+            applyErrorState(error.localizedDescription)
         }
     }
 
@@ -91,11 +78,45 @@ final class DashboardViewModel {
         heartbeats = [:]
         incidents = []
         maintenances = []
+        incidentRecords = []
+        lastIncidentDate = nil
         errorMessage = nil
     }
 
     func refresh() async {
         await fetchData()
+    }
+
+    func applyStatusPageResult(_ result: StatusPageResult) {
+        groups = result.groups
+        heartbeats = result.heartbeats
+        incidents = result.incidents
+        maintenances = result.maintenances
+        lastFetchTime = Date()
+        errorMessage = nil
+        loadPreferences()
+        loadLastIncidentDate()
+    }
+
+    func applyStatusPageResult(_ result: StatusPageResult, for connectionId: UUID) {
+        guard connection.id == connectionId else { return }
+        applyStatusPageResult(result)
+    }
+
+    func applyErrorState(_ message: String) {
+        groups = []
+        heartbeats = [:]
+        incidents = []
+        maintenances = []
+        incidentRecords = []
+        lastIncidentDate = nil
+        lastFetchTime = nil
+        errorMessage = message
+    }
+
+    func applyErrorState(_ message: String, for connectionId: UUID) {
+        guard connection.id == connectionId else { return }
+        applyErrorState(message)
     }
 
     // MARK: - Persistence
@@ -252,6 +273,7 @@ final class DashboardViewModel {
         recomputeSummary()
         recomputeServerLatency()
         recomputeFilteredGroups()
+        recomputeOverallStatus()
     }
 
     private func recomputeSummary() {
@@ -272,9 +294,8 @@ final class DashboardViewModel {
         }
 
         summaryText = String.localizedStringWithFormat(
-            String(localized: "%lld/%lld OK — %@"),
-            Int64(up),
-            Int64(total),
+            String(localized: "%@ — %@"),
+            WidgetData.monitorSummaryLine(upCount: up, totalCount: total),
             timeAgo
         )
     }
@@ -292,7 +313,9 @@ final class DashboardViewModel {
     private func recomputeFilteredGroups() {
         filteredGroups = groups.map { group in
             let filtered = group.monitors
+                .enumerated()
                 .filter { monitor in
+                    let monitor = monitor.element
                     let matchesStatus = statusFilter == nil || monitor.currentStatus == statusFilter
                     let matchesSearch = searchText.isEmpty
                         || monitor.name.localizedCaseInsensitiveContains(searchText)
@@ -305,13 +328,20 @@ final class DashboardViewModel {
                     return matchesStatus && matchesSearch && passesHidden
                 }
                 .sorted { a, b in
-                    let aKey = MonitorPreference.makeCompositeKey(monitorId: a.id, serverConnectionId: connection.id)
-                    let bKey = MonitorPreference.makeCompositeKey(monitorId: b.id, serverConnectionId: connection.id)
+                    let aKey = MonitorPreference.makeCompositeKey(
+                        monitorId: a.element.id,
+                        serverConnectionId: connection.id
+                    )
+                    let bKey = MonitorPreference.makeCompositeKey(
+                        monitorId: b.element.id,
+                        serverConnectionId: connection.id
+                    )
                     let aPinned = monitorPreferences[aKey]?.isPinned ?? false
                     let bPinned = monitorPreferences[bKey]?.isPinned ?? false
                     if aPinned != bPinned { return aPinned }
-                    return false
+                    return a.offset < b.offset
                 }
+                .map(\.element)
 
             return UnifiedGroup(
                 id: group.id,
@@ -321,5 +351,41 @@ final class DashboardViewModel {
             )
         }
         .filter { !$0.monitors.isEmpty }
+    }
+
+    private func recomputeOverallStatus() {
+        let allMonitors = groups.flatMap(\.monitors)
+        guard !allMonitors.isEmpty else {
+            overallStatus = .unreachable
+            return
+        }
+
+        let downCount = allMonitors.filter { $0.currentStatus == .down }.count
+        if downCount > 0 {
+            overallStatus = .someDown(count: downCount, total: allMonitors.count)
+            return
+        }
+
+        if let reason = findDegradedReason(monitors: allMonitors) {
+            overallStatus = .degraded(reason: reason)
+            return
+        }
+
+        overallStatus = .allUp
+    }
+
+    private func findDegradedReason(monitors: [UnifiedMonitor]) -> OverallStatus.DegradedReason? {
+        for monitor in monitors {
+            if let ping = monitor.latestPing, ping > AppConstants.degradedPingThreshold {
+                return .highPing(monitorName: monitor.name, pingMs: ping)
+            }
+            if let uptime = monitor.uptime24h, uptime < AppConstants.degradedUptimeThreshold {
+                return .lowUptime(monitorName: monitor.name, uptimePercent: uptime)
+            }
+            if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
+                return .certExpiringSoon(monitorName: monitor.name, daysRemaining: days)
+            }
+        }
+        return nil
     }
 }

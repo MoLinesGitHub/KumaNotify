@@ -11,8 +11,14 @@ final class MenuBarViewModel {
     private let persistence: PersistenceManager?
     private let storeManager: StoreManager?
     private let powerMonitor: PowerMonitor
+    private let notifications: NotificationManaging
     private let widgetDefaults: UserDefaults?
     private let reloadWidgets: () -> Void
+    private let notificationAuthorizationStatusProvider: @Sendable () async -> NotificationAuthorizationStatus
+    private var lastWidgetReloadSignature: String?
+
+    private var latestStatusPageResults: [UUID: StatusPageResult] = [:]
+    private var latestConnectionErrors: [UUID: String] = [:]
 
     var overallStatus: OverallStatus = .unreachable
     var upCount = 0
@@ -24,14 +30,20 @@ final class MenuBarViewModel {
     // Namespaced: "serverConnectionId:monitorId"
     private var previousMonitorStatuses: [String: MonitorStatus] = [:]
     private var monitorDownSince: [String: Date] = [:]
+    private var lastCertExpiryWarningDays: [String: Int] = [:]
 
     var iconStyle: MenuBarIconStyle { settingsStore.menuBarIconStyle }
     var statusColor: Color { overallStatus.color }
 
     var menuBarTitle: String {
         switch iconStyle {
-        case .sfSymbol, .colorDot: ""
-        case .textAndIcon: "\(upCount)/\(totalCount)"
+        case .sfSymbol, .colorDot:
+            return ""
+        case .textAndIcon:
+            if case .unreachable = overallStatus {
+                return ""
+            }
+            return "\(upCount)/\(totalCount)"
         }
     }
 
@@ -47,7 +59,11 @@ final class MenuBarViewModel {
         persistence: PersistenceManager? = nil,
         storeManager: StoreManager? = nil,
         powerMonitor: PowerMonitor = PowerMonitor(),
+        notifications: NotificationManaging = NotificationManager.shared,
         widgetDefaults: UserDefaults? = UserDefaults(suiteName: AppConstants.appGroupId),
+        notificationAuthorizationStatusProvider: @escaping @Sendable () async -> NotificationAuthorizationStatus = {
+            await NotificationManager.shared.notificationAuthorizationStatus()
+        },
         reloadWidgets: @escaping () -> Void = {
             WidgetCenter.shared.reloadTimelines(ofKind: AppConstants.widgetKind)
         },
@@ -60,8 +76,10 @@ final class MenuBarViewModel {
         self.persistence = persistence
         self.storeManager = storeManager
         self.powerMonitor = powerMonitor
+        self.notifications = notifications
         self.widgetDefaults = widgetDefaults
         self.reloadWidgets = reloadWidgets
+        self.notificationAuthorizationStatusProvider = notificationAuthorizationStatusProvider
         if shouldStartMonitors {
             self.networkMonitor.start()
             self.powerMonitor.start()
@@ -97,23 +115,39 @@ final class MenuBarViewModel {
         await fetchAllServers()
     }
 
+    func statusPageResult(for connectionId: UUID) -> StatusPageResult? {
+        latestStatusPageResults[connectionId]
+    }
+
+    func connectionErrorMessage(for connectionId: UUID) -> String? {
+        latestConnectionErrors[connectionId]
+    }
+
     // MARK: - Multi-server fetch
 
     private func fetchAllServers() async {
+        let connections = settingsStore.serverConnections
+        settingsStore.notificationAuthorizationStatus = await notificationAuthorizationStatusProvider()
+
         guard networkMonitor.isConnected else {
+            let offlineMessage = String(localized: "No network connection")
+            clearConnectionSnapshots(errorMessage: offlineMessage, connections: connections)
             overallStatus = .unreachable
             upCount = 0
             totalCount = 0
             lastCheckTime = Date()
             hasActiveIncident = false
-            errorMessage = String(localized: "No network connection")
+            errorMessage = offlineMessage
+            pollingEngine.reportFailure()
             publishWidgetData(downCount: 0)
             refreshPollingInterval()
             return
         }
 
-        let connections = settingsStore.serverConnections
-        guard !connections.isEmpty else { return }
+        guard !connections.isEmpty else {
+            clearConnectionSnapshots()
+            return
+        }
 
         var allUp = 0
         var allTotal = 0
@@ -126,6 +160,8 @@ final class MenuBarViewModel {
             let service = serviceFactory(connection.provider)
             do {
                 let result = try await service.fetchStatusPage(connection: connection)
+                latestStatusPageResults[connection.id] = result
+                latestConnectionErrors[connection.id] = nil
                 let monitors = result.groups.flatMap(\.monitors)
 
                 let up = monitors.filter { $0.currentStatus == .up }.count
@@ -134,12 +170,11 @@ final class MenuBarViewModel {
                 allTotal += monitors.count
                 allDown += down
 
-                if settingsStore.notificationsEnabled {
-                    detectStateTransitions(
-                        monitors: monitors,
-                        connection: connection
-                    )
-                }
+                detectStateTransitions(
+                    monitors: monitors,
+                    connection: connection
+                )
+                pruneMonitorState(for: connection.id, activeMonitorIDs: Set(monitors.map(\.id)))
 
                 if degradedReason == nil {
                     degradedReason = findDegradedReason(monitors: monitors)
@@ -147,6 +182,8 @@ final class MenuBarViewModel {
             } catch {
                 failedConnections += 1
                 anyError = error.localizedDescription
+                latestStatusPageResults[connection.id] = nil
+                latestConnectionErrors[connection.id] = error.localizedDescription
             }
         }
 
@@ -159,10 +196,10 @@ final class MenuBarViewModel {
             errorMessage = anyError ?? String(localized: "One or more servers are unreachable")
             overallStatus = .unreachable
             pollingEngine.reportFailure()
-        } else if allTotal == 0, let anyError {
-            errorMessage = anyError
+        } else if allTotal == 0 {
+            errorMessage = nil
             overallStatus = .unreachable
-            pollingEngine.reportFailure()
+            pollingEngine.reportSuccess()
         } else {
             errorMessage = nil
             if allDown > 0 {
@@ -179,6 +216,20 @@ final class MenuBarViewModel {
         refreshPollingInterval()
     }
 
+    private func clearConnectionSnapshots(
+        errorMessage: String? = nil,
+        connections: [ServerConnection] = []
+    ) {
+        latestStatusPageResults.removeAll()
+        if let errorMessage {
+            latestConnectionErrors = Dictionary(
+                uniqueKeysWithValues: connections.map { ($0.id, errorMessage) }
+            )
+        } else {
+            latestConnectionErrors.removeAll()
+        }
+    }
+
     private func publishWidgetData(downCount: Int) {
         let data = WidgetData(
             upCount: upCount,
@@ -191,6 +242,9 @@ final class MenuBarViewModel {
         )
         if let defaults = widgetDefaults {
             data.write(to: defaults)
+            let signature = data.reloadSignature
+            guard signature != lastWidgetReloadSignature else { return }
+            lastWidgetReloadSignature = signature
             reloadWidgets()
         }
     }
@@ -198,26 +252,38 @@ final class MenuBarViewModel {
     // MARK: - State transitions
 
     private func detectStateTransitions(monitors: [UnifiedMonitor], connection: ServerConnection) {
-        // Skip notifications if DND active or notifications disabled
-        guard !settingsStore.isDndActive else {
-            // Still record incidents even during DND
-            recordTransitionsOnly(monitors: monitors, connection: connection)
-            return
-        }
-
-        let notifications = NotificationManager.shared
         let soundOption = settingsStore.notificationSound
+        let shouldSendNotifications =
+            settingsStore.notificationsEnabled
+            && settingsStore.notificationAuthorizationStatus == .authorized
+            && !settingsStore.isDndActive
 
         for monitor in monitors {
-            let key = "\(connection.id):\(monitor.id)"
+            let key = monitorStateKey(connectionId: connection.id, monitorId: monitor.id)
             let previousStatus = previousMonitorStatuses[key]
             let isAcknowledged = settingsStore.isMonitorAcknowledged(
                 connectionId: connection.id, monitorId: monitor.id
             )
 
+            if let daysRemaining = monitor.certExpiryDays,
+               (0..<AppConstants.certExpiryWarningDays).contains(daysRemaining) {
+                if shouldSendNotifications, lastCertExpiryWarningDays[key] != daysRemaining {
+                    notifications.sendCertExpiryWarning(
+                        serverConnectionId: connection.id,
+                        monitorId: monitor.id,
+                        monitorName: monitor.name,
+                        daysRemaining: daysRemaining,
+                        soundOption: soundOption
+                    )
+                    lastCertExpiryWarningDays[key] = daysRemaining
+                }
+            } else {
+                lastCertExpiryWarningDays.removeValue(forKey: key)
+            }
+
             if previousStatus == .up && monitor.currentStatus == .down {
                 monitorDownSince[key] = Date()
-                if !isAcknowledged {
+                if shouldSendNotifications && !isAcknowledged {
                     notifications.sendDownAlert(
                         serverConnectionId: connection.id,
                         monitorId: monitor.id, monitorName: monitor.name,
@@ -236,7 +302,7 @@ final class MenuBarViewModel {
                 monitorDownSince.removeValue(forKey: key)
                 // Auto-clear acknowledge on recovery
                 settingsStore.unacknowledgeMonitor(connectionId: connection.id, monitorId: monitor.id)
-                if !isAcknowledged {
+                if shouldSendNotifications && !isAcknowledged {
                     notifications.sendRecoveryAlert(
                         serverConnectionId: connection.id,
                         monitorId: monitor.id, monitorName: monitor.name,
@@ -258,31 +324,31 @@ final class MenuBarViewModel {
         }
     }
 
-    /// Record state transitions for persistence without sending notifications (used during DND)
-    private func recordTransitionsOnly(monitors: [UnifiedMonitor], connection: ServerConnection) {
-        for monitor in monitors {
-            let key = "\(connection.id):\(monitor.id)"
-            let previousStatus = previousMonitorStatuses[key]
+    private func pruneMonitorState(for connectionId: UUID, activeMonitorIDs: Set<String>) {
+        pruneStateDictionary(&previousMonitorStatuses, connectionId: connectionId, activeMonitorIDs: activeMonitorIDs)
+        pruneStateDictionary(&monitorDownSince, connectionId: connectionId, activeMonitorIDs: activeMonitorIDs)
+        pruneStateDictionary(&lastCertExpiryWarningDays, connectionId: connectionId, activeMonitorIDs: activeMonitorIDs)
+    }
 
-            if previousStatus == .up && monitor.currentStatus == .down {
-                monitorDownSince[key] = Date()
-                persistence?.recordIncident(IncidentRecord(
-                    monitorId: monitor.id, monitorName: monitor.name,
-                    serverConnectionId: connection.id, serverName: connection.name,
-                    transitionType: .wentDown
-                ))
-            } else if previousStatus == .down && monitor.currentStatus == .up {
-                let downDuration = monitorDownSince[key].map { Date().timeIntervalSince($0) }
-                monitorDownSince.removeValue(forKey: key)
-                persistence?.recordIncident(IncidentRecord(
-                    monitorId: monitor.id, monitorName: monitor.name,
-                    serverConnectionId: connection.id, serverName: connection.name,
-                    transitionType: .recovered, downDuration: downDuration
-                ))
-            }
-
-            previousMonitorStatuses[key] = monitor.currentStatus
+    private func pruneStateDictionary<Value>(
+        _ dictionary: inout [String: Value],
+        connectionId: UUID,
+        activeMonitorIDs: Set<String>
+    ) {
+        let prefix = "\(connectionId.uuidString):"
+        let keysToRemove = dictionary.keys.filter { key in
+            guard key.hasPrefix(prefix) else { return false }
+            let monitorID = String(key.dropFirst(prefix.count))
+            return !activeMonitorIDs.contains(monitorID)
         }
+
+        for key in keysToRemove {
+            dictionary.removeValue(forKey: key)
+        }
+    }
+
+    private func monitorStateKey(connectionId: UUID, monitorId: String) -> String {
+        "\(connectionId.uuidString):\(monitorId)"
     }
 
     private func findDegradedReason(monitors: [UnifiedMonitor]) -> OverallStatus.DegradedReason? {

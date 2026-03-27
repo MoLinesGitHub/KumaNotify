@@ -21,7 +21,8 @@ final class SettingsStore {
         defaults.register(defaults: [
             "pollingInterval": AppConstants.defaultPollingInterval,
             "iconStyle": MenuBarIconStyle.sfSymbol.rawValue,
-            "notificationsEnabled": true,
+            "notificationsEnabled": false,
+            "notificationAuthorizationStatus": NotificationAuthorizationStatus.notDetermined.rawValue,
         ])
     }
 
@@ -58,6 +59,15 @@ final class SettingsStore {
     var notificationsEnabled: Bool {
         get { defaults.bool(forKey: "notificationsEnabled") }
         set { defaults.set(newValue, forKey: "notificationsEnabled") }
+    }
+
+    var notificationAuthorizationStatus: NotificationAuthorizationStatus {
+        get {
+            NotificationAuthorizationStatus(
+                rawValue: defaults.string(forKey: "notificationAuthorizationStatus") ?? ""
+            ) ?? .notDetermined
+        }
+        set { defaults.set(newValue.rawValue, forKey: "notificationAuthorizationStatus") }
     }
 
     var notificationSound: NotificationSoundOption {
@@ -118,7 +128,8 @@ final class SettingsStore {
         }
         set {
             do {
-                let data = try JSONEncoder().encode(newValue)
+                let normalized = normalizedConnections(newValue)
+                let data = try JSONEncoder().encode(normalized)
                 defaults.set(data, forKey: "serverConnections")
                 // Clean up legacy key after migration
                 defaults.removeObject(forKey: "serverConnection")
@@ -139,7 +150,7 @@ final class SettingsStore {
                 } else {
                     connections.append(newValue)
                 }
-                serverConnections = connections
+                serverConnections = normalizedConnections(connections, preferredDefaultId: newValue.id)
             }
         }
     }
@@ -177,7 +188,11 @@ final class SettingsStore {
         var connections = serverConnections
         if let idx = connections.firstIndex(where: { $0.id == connection.id }) {
             connections[idx] = connection
-            serverConnections = connections
+            let preferredDefaultId = connection.isDefault ? connection.id : nil
+            serverConnections = normalizedConnections(
+                connections,
+                preferredDefaultId: preferredDefaultId
+            )
         }
     }
 
@@ -185,6 +200,23 @@ final class SettingsStore {
     private var legacyServerConnection: ServerConnection? {
         guard let data = defaults.data(forKey: "serverConnection") else { return nil }
         return try? JSONDecoder().decode(ServerConnection.self, from: data)
+    }
+
+    private func normalizedConnections(
+        _ connections: [ServerConnection],
+        preferredDefaultId: UUID? = nil
+    ) -> [ServerConnection] {
+        guard !connections.isEmpty else { return [] }
+
+        let defaultId = preferredDefaultId
+            ?? connections.first(where: \.isDefault)?.id
+            ?? connections.first?.id
+
+        return connections.map { connection in
+            var normalized = connection
+            normalized.isDefault = (connection.id == defaultId)
+            return normalized
+        }
     }
 
     // MARK: - Launch at Login

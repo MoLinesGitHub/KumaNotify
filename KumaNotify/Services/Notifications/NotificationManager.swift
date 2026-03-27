@@ -1,8 +1,41 @@
 import Foundation
+import AppKit
 import UserNotifications
 import os
 
-final class NotificationManager: NSObject, Sendable {
+enum NotificationAuthorizationStatus: String, Sendable {
+    case notDetermined
+    case denied
+    case authorized
+}
+
+@MainActor
+protocol NotificationManaging: AnyObject {
+    func sendDownAlert(
+        serverConnectionId: UUID,
+        monitorId: String,
+        monitorName: String,
+        serverName: String,
+        soundOption: NotificationSoundOption
+    )
+    func sendRecoveryAlert(
+        serverConnectionId: UUID,
+        monitorId: String,
+        monitorName: String,
+        serverName: String,
+        downDuration: TimeInterval?,
+        soundOption: NotificationSoundOption
+    )
+    func sendCertExpiryWarning(
+        serverConnectionId: UUID,
+        monitorId: String,
+        monitorName: String,
+        daysRemaining: Int,
+        soundOption: NotificationSoundOption
+    )
+}
+
+final class NotificationManager: NSObject, Sendable, NotificationManaging {
     static let shared = NotificationManager()
 
     static func downAlertIdentifier(serverConnectionId: UUID, monitorId: String) -> String {
@@ -17,14 +50,42 @@ final class NotificationManager: NSObject, Sendable {
         "cert_\(serverConnectionId.uuidString)_\(monitorId)_\(daysRemaining)"
     }
 
-    func requestPermission() async -> Bool {
+    func requestPermission() async -> NotificationAuthorizationStatus {
         do {
-            return try await UNUserNotificationCenter.current()
+            _ = try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound, .badge])
+            return await notificationAuthorizationStatus()
         } catch {
             Logger.app.error("Notification permission request failed: \(error.localizedDescription)")
-            return false
+            return .denied
         }
+    }
+
+    func notificationAuthorizationStatus() async -> NotificationAuthorizationStatus {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return .authorized
+        case .notDetermined:
+            return .notDetermined
+        default:
+            return .denied
+        }
+    }
+
+    func notificationsAuthorized() async -> Bool {
+        await notificationAuthorizationStatus() == .authorized
+    }
+
+    @discardableResult
+    func openSystemNotificationSettings() -> Bool {
+        if let deepLink = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension"),
+           NSWorkspace.shared.open(deepLink) {
+            return true
+        }
+
+        let systemSettingsURL = URL(fileURLWithPath: "/System/Applications/System Settings.app")
+        return NSWorkspace.shared.open(systemSettingsURL)
     }
 
     func sendDownAlert(
@@ -102,7 +163,7 @@ final class NotificationManager: NSObject, Sendable {
 
     func sendTestNotification(soundOption: NotificationSoundOption = .system) {
         let content = UNMutableNotificationContent()
-        content.title = "Kuma Notify"
+        content.title = String(localized: "Kuma Notify")
         content.body = String(localized: "Test notification — sound is working!")
         content.sound = soundOption == .silent ? nil : .default
 

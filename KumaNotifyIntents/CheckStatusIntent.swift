@@ -58,10 +58,13 @@ enum IntentStatusFormatter {
             status = OverallStatus.unreachable.label
         }
 
+        if data.overallStatusRaw == "unreachable" {
+            return (value: status, dialog: status)
+        }
+
         let summary = String.localizedStringWithFormat(
-            String(localized: "%lld/%lld OK — %@"),
-            Int64(data.upCount),
-            Int64(data.totalCount),
+            String(localized: "%@ — %@"),
+            data.monitorSummaryLine,
             status
         )
         return (value: summary, dialog: summary)
@@ -70,6 +73,10 @@ enum IntentStatusFormatter {
     static func monitorCountSummary(for data: WidgetData?) -> String {
         guard let data else {
             return String(localized: "No data")
+        }
+
+        if data.overallStatusRaw == "unreachable" {
+            return OverallStatus.unreachable.label
         }
 
         return String.localizedStringWithFormat(

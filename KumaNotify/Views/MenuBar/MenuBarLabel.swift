@@ -4,7 +4,11 @@ struct MenuBarLabel: View {
     let viewModel: MenuBarViewModel
 
     private var accessibilityDescription: String {
-        String.localizedStringWithFormat(
+        if case .unreachable = viewModel.overallStatus {
+            return viewModel.overallStatus.label
+        }
+
+        return String.localizedStringWithFormat(
             String(localized: "%@. %lld of %lld monitors up."),
             viewModel.overallStatus.label,
             Int64(viewModel.upCount),
@@ -31,9 +35,11 @@ struct MenuBarLabel: View {
                     Image(systemName: viewModel.menuBarImage)
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(viewModel.statusColor, .primary)
-                    Text(viewModel.menuBarTitle)
-                        .monospacedDigit()
-                        .font(.caption2)
+                    if !viewModel.menuBarTitle.isEmpty {
+                        Text(viewModel.menuBarTitle)
+                            .monospacedDigit()
+                            .font(.caption2)
+                    }
                 }
             }
         }
