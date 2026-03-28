@@ -22,6 +22,12 @@ enum MenuBarLabelLogic {
 struct MenuBarLabel: View {
     let viewModel: MenuBarViewModel
 
+    private enum Metrics {
+        static let iconOnlySize: CGFloat = 12
+        static let textAndIconSize: CGFloat = 10
+        static let iconBoundingBox: CGFloat = 16
+    }
+
     @ViewBuilder
     private func statusIcon(size: CGFloat) -> some View {
         Image(viewModel.menuBarImage)
@@ -29,6 +35,8 @@ struct MenuBarLabel: View {
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
+            .frame(width: Metrics.iconBoundingBox, height: Metrics.iconBoundingBox)
+            .clipped()
             .accessibilityHidden(true)
     }
 
@@ -44,7 +52,7 @@ struct MenuBarLabel: View {
         Group {
             switch viewModel.iconStyle {
             case .sfSymbol:
-                statusIcon(size: 16)
+                statusIcon(size: Metrics.iconOnlySize)
 
             case .colorDot:
                 Image(systemName: "circle.fill")
@@ -53,7 +61,7 @@ struct MenuBarLabel: View {
 
             case .textAndIcon:
                 HStack(spacing: 3) {
-                    statusIcon(size: 14)
+                    statusIcon(size: Metrics.textAndIconSize)
                     if !viewModel.menuBarTitle.isEmpty {
                         Text(viewModel.menuBarTitle)
                             .monospacedDigit()
