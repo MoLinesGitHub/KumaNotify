@@ -111,7 +111,7 @@ struct KumaNotifyApp: App {
 
     init() {
         let environment = ProcessInfo.processInfo.environment
-        let settingsSuiteName = environment["KUMA_SETTINGS_SUITE_NAME"] ?? AppConstants.appGroupId
+        let settingsSuiteName = environment["KUMA_SETTINGS_SUITE_NAME"]
         self.uiTestShowsOnboarding = environment["KUMA_UI_TEST_SHOW_ONBOARDING"] == "1"
         self.uiTestShowsSettings = environment["KUMA_UI_TEST_SHOW_SETTINGS"] == "1"
         self.uiTestShowsPaywall = environment["KUMA_UI_TEST_SHOW_PAYWALL"] == "1"
