@@ -1454,6 +1454,7 @@
       }
     },
     "Open Settings..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "es" : {
           "stringUnit" : {

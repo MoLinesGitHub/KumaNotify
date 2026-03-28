@@ -37,7 +37,9 @@ struct KumaNotifyApp: App {
     @State private var menuBarVM: MenuBarViewModel?
     @State private var dashboardVM: DashboardViewModel?
     @State private var showOnboarding = false
+    @State private var settingsPresentationRequest = 0
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some Scene {
         menuBarScene
@@ -61,6 +63,9 @@ struct KumaNotifyApp: App {
                     onOpenWizard: {
                         requestOnboardingPresentation()
                     },
+                    onOpenSettings: {
+                        requestSettingsPresentation()
+                    },
                     onQuit: {
                         NSApplication.shared.terminate(nil)
                     }
@@ -83,6 +88,12 @@ struct KumaNotifyApp: App {
         }
         .onChange(of: settingsStore.pollingInterval) {
             menuBarVM?.refreshPollingInterval()
+        }
+        .onChange(of: showOnboarding) {
+            presentOnboardingIfNeeded()
+        }
+        .onChange(of: settingsPresentationRequest) {
+            presentSettingsIfNeeded()
         }
     }
 
@@ -300,6 +311,10 @@ struct KumaNotifyApp: App {
         showOnboarding = true
     }
 
+    private func requestSettingsPresentation() {
+        settingsPresentationRequest += 1
+    }
+
     private func presentOnboardingIfNeeded() {
         guard Self.shouldPresentOnboarding(
             showOnboarding: showOnboarding,
@@ -308,6 +323,32 @@ struct KumaNotifyApp: App {
         showOnboarding = false
         NSApp.activate(ignoringOtherApps: true)
         openWindow(id: "onboarding")
+        promoteFrontmostWindow()
+    }
+
+    private func presentSettingsIfNeeded() {
+        guard settingsPresentationRequest > 0 else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
+        promoteFrontmostWindow()
+    }
+
+    private func promoteFrontmostWindow() {
+        Task { @MainActor in
+            for delay in [UInt64(0), 150_000_000, 350_000_000] {
+                if delay > 0 {
+                    try? await Task.sleep(nanoseconds: delay)
+                }
+                guard let window = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.orderedWindows.first else {
+                    continue
+                }
+                window.level = .floating
+                window.collectionBehavior.insert(.moveToActiveSpace)
+                window.orderFrontRegardless()
+                window.makeKeyAndOrderFront(nil)
+                break
+            }
+        }
     }
 
     private static func clearSharedWidgetData() {

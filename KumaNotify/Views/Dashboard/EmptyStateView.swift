@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EmptyStateView: View {
     let onOpenWizard: () -> Void
+    let onOpenSettings: () -> Void
     let onQuit: () -> Void
 
     var body: some View {
@@ -16,16 +17,9 @@ struct EmptyStateView: View {
                 onOpenWizard()
             }
 
-            SettingsLink {
-                HStack {
-                    Image(systemName: "gear")
-                    Text("Open Settings...")
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+            MenuBarButton(title: "Open Settings...", icon: "gear") {
+                onOpenSettings()
             }
-            .buttonStyle(.plain)
 
             Divider()
 
