@@ -2,7 +2,7 @@
   "images" : [
     {
       "filename" : "MenuBarIconUp.svg",
-      "idiom" : "universal"
+      "idiom" : "mac"
     }
   ],
   "info" : {

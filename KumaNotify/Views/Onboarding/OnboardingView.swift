@@ -41,6 +41,7 @@ struct OnboardingView: View {
     @Bindable var settingsStore: SettingsStore
     var onComplete: () -> Void
 
+    @Environment(\.dismiss) private var dismiss
     @State private var step = 0
     @State private var serverURL = ""
     @State private var slug = ""
@@ -71,22 +72,23 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Group {
+                switch step {
+                case 0: welcomeStep
+                case 1: serverStep
+                default: completionStep
+                }
+            }
+
             // Progress dots
             HStack(spacing: 8) {
                 ForEach(0..<3, id: \.self) { i in
                     Circle()
-                        .fill(i <= step ? Color.accentColor : Color.gray.opacity(0.3))
+                        .fill(i <= step ? Color(red: 0.722, green: 0.922, blue: 0.792) : Color.gray.opacity(0.3))
                         .frame(width: 8, height: 8)
                 }
             }
-            .padding(.top, 20)
-
-            TabView(selection: $step) {
-                welcomeStep.tag(0)
-                serverStep.tag(1)
-                completionStep.tag(2)
-            }
-            .tabViewStyle(.automatic)
+            .padding(.bottom, 20)
         }
         .frame(width: 440, height: 360)
     }
@@ -98,7 +100,7 @@ struct OnboardingView: View {
             Spacer()
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 56))
-                .foregroundStyle(.tint)
+                .foregroundStyle(Color(red: 0.722, green: 0.922, blue: 0.792))
                 .symbolEffect(.pulse)
 
             Text("Welcome to Kuma Notify")
@@ -204,6 +206,7 @@ struct OnboardingView: View {
             Button("Start Monitoring") {
                 settingsStore.hasCompletedOnboarding = true
                 onComplete()
+                dismiss()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
