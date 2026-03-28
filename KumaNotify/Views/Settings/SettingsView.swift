@@ -59,6 +59,12 @@ enum SettingsViewLogic {
     }
 }
 
+private enum SettingsLinks {
+    static let website = URL(string: "https://www.molinesdesigns.com")!
+    static let privacy = URL(string: "https://www.molinesdesigns.com/privacy")!
+    static let terms = URL(string: "https://www.molinesdesigns.com/terms")!
+}
+
 struct SettingsView: View {
     @Bindable var settingsStore: SettingsStore
     var storeManager: StoreManager?
@@ -84,6 +90,8 @@ struct SettingsView: View {
                 .tabItem { Label("Appearance", systemImage: "paintbrush") }
             generalTab
                 .tabItem { Label("General", systemImage: "gear") }
+            aboutTab
+                .tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 440, height: 380)
         .task {
@@ -414,6 +422,63 @@ struct SettingsView: View {
                     get: { settingsStore.launchAtLogin },
                     set: { settingsStore.launchAtLogin = $0 }
                 ))
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private var aboutTab: some View {
+        Form {
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.18), .mint.opacity(0.18)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 44, height: 44)
+                            .overlay {
+                                Image(systemName: "sparkles")
+                                    .font(.title3)
+                                    .foregroundStyle(.blue)
+                            }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Built by Molines Designs")
+                                .font(.headline)
+                            Text("Design-driven apps, interfaces, and digital products.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Link(destination: SettingsLinks.website) {
+                        Label("Visit molinesdesigns.com", systemImage: "arrow.up.right.square")
+                    }
+                    .accessibilityIdentifier("settings.molinesWebsiteLink")
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Molines Designs")
+            } footer: {
+                Text("Explore more work, product updates, and design services from Molines Designs.")
+            }
+
+            Section("Legal") {
+                Link(destination: SettingsLinks.privacy) {
+                    Label("Privacy Policy", systemImage: "hand.raised")
+                }
+                .accessibilityIdentifier("settings.privacyPolicyLink")
+
+                Link(destination: SettingsLinks.terms) {
+                    Label("Terms of Use", systemImage: "doc.text")
+                }
+                .accessibilityIdentifier("settings.termsLink")
             }
         }
         .formStyle(.grouped)

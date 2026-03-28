@@ -59,8 +59,7 @@ struct KumaNotifyApp: App {
             } else {
                 EmptyStateView(
                     onOpenWizard: {
-                        NSApp.activate(ignoringOtherApps: true)
-                        openWindow(id: "onboarding")
+                        requestOnboardingPresentation()
                     },
                     onQuit: {
                         NSApplication.shared.terminate(nil)
@@ -295,6 +294,10 @@ struct KumaNotifyApp: App {
             await persistence?.purgeOldIncidents()
         }
         menuBarVM.startPolling()
+    }
+
+    private func requestOnboardingPresentation() {
+        showOnboarding = true
     }
 
     private func presentOnboardingIfNeeded() {
