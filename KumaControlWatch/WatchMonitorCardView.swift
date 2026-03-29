@@ -28,17 +28,16 @@ struct WatchMonitorCardView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(monitor.name)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
+                    MarqueeText(
+                        text: monitor.name,
+                        font: .system(size: 13, weight: .semibold, design: .rounded),
+                        color: .white
+                    )
 
                     Text(monitor.currentStatus.label)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(monitor.currentStatus.color.opacity(0.85))
                 }
-
-                Spacer(minLength: 0)
             }
 
             // Secondary data row

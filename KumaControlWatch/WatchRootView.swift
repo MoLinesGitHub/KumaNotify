@@ -10,12 +10,18 @@ struct WatchRootView: View {
 
     var body: some View {
         ZStack {
-            if showSplash, configurationStore.connection != nil {
+            if showSplash {
+                let hasConnection = configurationStore.connection != nil
                 WatchSplashView(
-                    isDataLoaded: viewModel.result != nil || viewModel.errorMessage != nil
+                    isDataLoaded: !hasConnection || viewModel.result != nil || viewModel.errorMessage != nil
                 ) {
                     withAnimation(.easeOut(duration: 0.3)) {
                         showSplash = false
+                    }
+                }
+                .task {
+                    if let connection = configurationStore.connection {
+                        await viewModel.refresh(connection: connection)
                     }
                 }
             } else {
@@ -51,7 +57,7 @@ struct WatchRootView: View {
         } else {
             NavigationStack {
                 WatchConnectionWizard(onComplete: handleSave(connection:))
-                    .navigationTitle(String(localized: "Setup"))
+                    .navigationTitle(String(localized: "Configuración"))
             }
         }
     }
@@ -107,13 +113,24 @@ private struct WatchDashboard: View {
                     }
                     .staggeredAppear(index: 1, baseDelay: 0.3)
 
-                    // Error message
+                    // Error message + WiFi tip
                     if let error = viewModel.errorMessage {
-                        Text(error)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.appStatusDown)
+                        VStack(spacing: 6) {
+                            Text(error)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.appStatusDown)
+                                .multilineTextAlignment(.center)
+
+                            HStack(spacing: 4) {
+                                Image(systemName: "wifi.exclamationmark")
+                                    .font(.system(size: 9))
+                                Text(String(localized: "El Apple Watch debe estar en la misma red WiFi que el servidor"))
+                                    .font(.system(size: 9))
+                            }
+                            .foregroundStyle(.white.opacity(0.55))
                             .multilineTextAlignment(.center)
-                            .glassCard(glowColor: .appStatusDown)
+                        }
+                        .glassCard(glowColor: .appStatusDown)
                     }
 
                     // Monitor cards
@@ -234,7 +251,7 @@ private struct WatchDashboard: View {
                         isShowingSettings = true
                     } label: {
                         Image(systemName: "gearshape")
-                            .foregroundStyle(.kumaGreen)
+                            .foregroundStyle(Color.kumaGreen)
                     }
                 }
 
@@ -246,7 +263,7 @@ private struct WatchDashboard: View {
                             ProgressView()
                         } else {
                             Image(systemName: "arrow.clockwise")
-                                .foregroundStyle(.kumaGreen)
+                                .foregroundStyle(Color.kumaGreen)
                         }
                     }
                     .disabled(viewModel.isLoading)
@@ -312,15 +329,28 @@ struct WatchConnectionWizard: View {
             }
             .padding(.bottom, 8)
 
-            // Step content
-            TabView(selection: $step) {
-                wizardProtocol.tag(0)
-                wizardIP.tag(1)
-                wizardPort.tag(2)
-                wizardSlug.tag(3)
-                wizardConfirm.tag(4)
+            // Step content — no TabView to avoid crown conflicts with pickers
+            Group {
+                switch step {
+                case 0: wizardProtocol
+                case 1: wizardIP
+                case 2: wizardPort
+                case 3: wizardSlug
+                default: wizardConfirm
+                }
             }
-            .tabViewStyle(.verticalPage)
+            .gesture(
+                DragGesture(minimumDistance: 30)
+                    .onEnded { value in
+                        let horizontal = value.translation.width
+                        if horizontal > 50, step > 0 {
+                            withAnimation(.spring(response: 0.35)) { step -= 1 }
+                        } else if horizontal < -50, step < totalSteps - 1 {
+                            withAnimation(.spring(response: 0.35)) { step += 1 }
+                        }
+                    }
+            )
+            .animation(.spring(response: 0.35), value: step)
         }
         .background(Color.black)
     }
@@ -328,9 +358,9 @@ struct WatchConnectionWizard: View {
     // Step 0: Protocol
     private var wizardProtocol: some View {
         VStack(spacing: 12) {
-            WizardStepLabel(title: String(localized: "Protocol"))
+            WizardStepLabel(title: String(localized: "Protocolo"))
 
-            Picker(String(localized: "Protocol"), selection: $selectedProtocol) {
+            Picker("", selection: $selectedProtocol) {
                 ForEach(Self.protocols, id: \.self) { proto in
                     Text(proto.uppercased())
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
@@ -340,7 +370,7 @@ struct WatchConnectionWizard: View {
             .pickerStyle(.wheel)
             .frame(height: 60)
 
-            WizardNextButton { step = 1 }
+            WizardNavButtons(showBack: false) { step = 1 }
         }
         .glassCard(glowColor: .kumaGreen)
     }
@@ -348,23 +378,19 @@ struct WatchConnectionWizard: View {
     // Step 1: IP Address
     private var wizardIP: some View {
         VStack(spacing: 8) {
-            WizardStepLabel(title: String(localized: "IP Address"))
+            WizardStepLabel(title: String(localized: "Dirección IP"))
 
-            HStack(spacing: 2) {
-                wizardOctetPicker($ipOctet1)
-                wizardDot
-                wizardOctetPicker($ipOctet2)
-                wizardDot
-                wizardOctetPicker($ipOctet3)
-                wizardDot
-                wizardOctetPicker($ipOctet4)
+            HStack(spacing: 3) {
+                OctetButton(value: $ipOctet1)
+                octetDotView
+                OctetButton(value: $ipOctet2)
+                octetDotView
+                OctetButton(value: $ipOctet3)
+                octetDotView
+                OctetButton(value: $ipOctet4)
             }
 
-            Text("\(ipOctet1).\(ipOctet2).\(ipOctet3).\(ipOctet4)")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.kumaGreen)
-
-            WizardNextButton { step = 2 }
+            WizardNavButtons(onBack: { step = 0 }) { step = 2 }
         }
         .glassCard(glowColor: .kumaGreen)
     }
@@ -372,9 +398,9 @@ struct WatchConnectionWizard: View {
     // Step 2: Port
     private var wizardPort: some View {
         VStack(spacing: 8) {
-            WizardStepLabel(title: String(localized: "Port"))
+            WizardStepLabel(title: String(localized: "Puerto"))
 
-            Picker(String(localized: "Port"), selection: $selectedPort) {
+            Picker("", selection: $selectedPort) {
                 ForEach(Self.portRange, id: \.self) { port in
                     Text(String(port))
                         .font(.system(size: 14, weight: .medium, design: .monospaced))
@@ -386,9 +412,9 @@ struct WatchConnectionWizard: View {
 
             Text(":\(selectedPort)")
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundStyle(.kumaGreen)
+                .foregroundStyle(Color.kumaGreen)
 
-            WizardNextButton { step = 3 }
+            WizardNavButtons(onBack: { step = 1 }) { step = 3 }
         }
         .glassCard(glowColor: .kumaGreen)
     }
@@ -396,14 +422,16 @@ struct WatchConnectionWizard: View {
     // Step 3: Slug
     private var wizardSlug: some View {
         VStack(spacing: 8) {
-            WizardStepLabel(title: String(localized: "Status Page Slug"))
+            WizardStepLabel(title: String(localized: "Slug de la página"))
 
             TextField(String(localized: "slug"), text: $statusPageSlug)
-                .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.system(size: 14, design: .monospaced))
 
-            WizardNextButton(disabled: statusPageSlug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            WizardNavButtons(
+                disableNext: statusPageSlug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                onBack: { step = 2 }
+            ) {
                 step = 4
             }
         }
@@ -413,7 +441,7 @@ struct WatchConnectionWizard: View {
     // Step 4: Confirm & Connect
     private var wizardConfirm: some View {
         VStack(spacing: 8) {
-            WizardStepLabel(title: String(localized: "Confirm"))
+            WizardStepLabel(title: String(localized: "Confirmar"))
 
             VStack(alignment: .leading, spacing: 4) {
                 wizardSummaryRow(String(localized: "URL"), composedURLString)
@@ -424,27 +452,47 @@ struct WatchConnectionWizard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if let error = connectError {
-                Text(error)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.appStatusDown)
-                    .lineLimit(3)
-            }
-
-            Button {
-                Task { await connect() }
-            } label: {
-                if isConnecting {
-                    ProgressView()
-                } else {
-                    Text(String(localized: "Connect"))
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
+                VStack(spacing: 4) {
+                    Text(error)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.appStatusDown)
+                        .lineLimit(3)
+                    HStack(spacing: 3) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 8))
+                        Text(String(localized: "El Watch debe estar en la misma WiFi que el servidor"))
+                            .font(.system(size: 8))
+                    }
+                    .foregroundStyle(.white.opacity(0.5))
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.kumaGreen)
-            .disabled(isConnecting)
+
+            HStack(spacing: 16) {
+                Button {
+                    withAnimation(.spring(response: 0.35)) { step = 3 }
+                } label: {
+                    Image(systemName: "arrow.left.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Task { await connect() }
+                } label: {
+                    if isConnecting {
+                        ProgressView()
+                    } else {
+                        Text(String(localized: "Conectar"))
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(.black)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.kumaGreen)
+                .disabled(isConnecting)
+            }
         }
         .glassCard(glowColor: .kumaGreen)
     }
@@ -456,27 +504,14 @@ struct WatchConnectionWizard: View {
             Spacer()
             Text(value)
                 .lineLimit(1)
-                .foregroundStyle(.kumaGreenLight)
+                .foregroundStyle(Color.kumaGreenLight)
         }
     }
 
-    private func wizardOctetPicker(_ value: Binding<Int>) -> some View {
-        Picker("", selection: value) {
-            ForEach(0...255, id: \.self) { n in
-                Text(String(n))
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                    .tag(n)
-            }
-        }
-        .pickerStyle(.wheel)
-        .frame(width: 36, height: 50)
-        .clipped()
-    }
-
-    private var wizardDot: some View {
+    private var octetDotView: some View {
         Text(".")
             .font(.system(size: 16, weight: .bold, design: .monospaced))
-            .foregroundStyle(.kumaGreen)
+            .foregroundStyle(Color.kumaGreen)
     }
 
     private var composedURLString: String {
@@ -488,11 +523,11 @@ struct WatchConnectionWizard: View {
         guard let baseURL = ServerConnection.validatedBaseURL(from: composedURLString),
               let slug = ServerConnection.validatedStatusPageSlug(from: statusPageSlug)
         else {
-            connectError = String(localized: "Invalid URL")
+            connectError = String(localized: "URL no válida")
             return
         }
 
-        let name = serverName.isEmpty ? String(localized: "My Kuma Server") : serverName
+        let name = serverName.isEmpty ? String(localized: "Mi servidor Kuma") : serverName
         let draft = ServerConnection(
             id: UUID(),
             name: ServerConnection.normalizedDisplayName(from: name),
@@ -521,28 +556,123 @@ private struct WizardStepLabel: View {
     var body: some View {
         Text(title)
             .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundStyle(.kumaGreenLight)
+            .foregroundStyle(Color.kumaGreenLight)
             .textCase(.uppercase)
     }
 }
 
-private struct WizardNextButton: View {
-    var disabled: Bool = false
-    let action: () -> Void
+private struct WizardNavButtons: View {
+    var showBack: Bool = true
+    var disableNext: Bool = false
+    let onBack: (() -> Void)?
+    let onNext: () -> Void
+
+    init(
+        showBack: Bool = true,
+        disableNext: Bool = false,
+        onBack: (() -> Void)? = nil,
+        onNext: @escaping () -> Void
+    ) {
+        self.showBack = showBack
+        self.disableNext = disableNext
+        self.onBack = onBack
+        self.onNext = onNext
+    }
+
+    var body: some View {
+        HStack(spacing: 32) {
+            if showBack, let onBack {
+                Button {
+                    withAnimation(.spring(response: 0.35)) {
+                        onBack()
+                    }
+                } label: {
+                    Image(systemName: "arrow.left.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                withAnimation(.spring(response: 0.35)) {
+                    onNext()
+                }
+            } label: {
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(Color.kumaGreen)
+            }
+            .buttonStyle(.plain)
+            .disabled(disableNext)
+            .opacity(disableNext ? 0.4 : 1)
+        }
+    }
+}
+
+// MARK: - Octet Button (tap to edit in dedicated sheet)
+
+private struct OctetButton: View {
+    @Binding var value: Int
+    @State private var isEditing = false
 
     var body: some View {
         Button {
-            withAnimation(.spring(response: 0.35)) {
-                action()
-            }
+            isEditing = true
         } label: {
-            Image(systemName: "arrow.right.circle.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(.kumaGreen)
+            Text(String(value))
+                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white)
+                .frame(minWidth: 32, minHeight: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(Color.kumaGreen.opacity(0.3), lineWidth: 0.5)
+                        )
+                )
         }
         .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(disabled ? 0.4 : 1)
+        .sheet(isPresented: $isEditing) {
+            OctetPickerSheet(value: $value)
+        }
+    }
+}
+
+private struct OctetPickerSheet: View {
+    @Binding var value: Int
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(String(value))
+                .font(.system(size: 28, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.kumaGreen)
+
+            Picker("", selection: $value) {
+                ForEach(0...255, id: \.self) { n in
+                    Text(String(n))
+                        .font(.system(size: 16, weight: .medium, design: .monospaced))
+                        .tag(n)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 80)
+
+            Button {
+                dismiss()
+            } label: {
+                Text("OK")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.kumaGreen)
+        }
+        .padding()
+        .background(Color.black)
     }
 }
 
@@ -611,24 +741,23 @@ struct WatchConnectionSettings: View {
                 // Tab selector
                 HStack(spacing: 0) {
                     settingsTabButton(String(localized: "Server"), systemImage: "server.rack", tab: 0)
-                    settingsTabButton(String(localized: "Network"), systemImage: "network", tab: 1)
-                    settingsTabButton(String(localized: "Danger"), systemImage: "exclamationmark.triangle", tab: 2)
+                    settingsTabButton(String(localized: "Red"), systemImage: "network", tab: 1)
+                    settingsTabButton(String(localized: "Zona de riesgo"), systemImage: "exclamationmark.triangle", tab: 2)
                 }
                 .padding(.horizontal, 4)
                 .padding(.bottom, 4)
 
-                TabView(selection: $selectedTab) {
-                    // Tab 0: Server
-                    serverTab.tag(0)
-                    // Tab 1: Network
-                    networkTab.tag(1)
-                    // Tab 2: Danger zone
-                    dangerTab.tag(2)
+                Group {
+                    switch selectedTab {
+                    case 0: serverTab
+                    case 1: networkTab
+                    default: dangerTab
+                    }
                 }
-                .tabViewStyle(.verticalPage)
+                .animation(.spring(response: 0.3), value: selectedTab)
             }
             .background(Color.black)
-            .navigationTitle(String(localized: "Settings"))
+            .navigationTitle(String(localized: "Ajustes"))
         }
     }
 
@@ -644,7 +773,7 @@ struct WatchConnectionSettings: View {
                 Text(label)
                     .font(.system(size: 8, weight: .medium))
             }
-            .foregroundStyle(selectedTab == tab ? .kumaGreen : .white.opacity(0.4))
+            .foregroundStyle(selectedTab == tab ? Color.kumaGreen : Color.white.opacity(0.4))
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
@@ -655,18 +784,18 @@ struct WatchConnectionSettings: View {
         ScrollView {
             VStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "Name"))
+                    Text(String(localized: "Nombre"))
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.kumaGreenLight)
+                        .foregroundStyle(Color.kumaGreenLight)
                     TextField(String(localized: "Server"), text: $name)
                         .font(.system(size: 13))
                 }
                 .glassCard(glowColor: .kumaGreenDim)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "Status Page Slug"))
+                    Text(String(localized: "Slug de la página"))
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.kumaGreenLight)
+                        .foregroundStyle(Color.kumaGreenLight)
                     TextField(String(localized: "slug"), text: $statusPageSlug)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -685,10 +814,10 @@ struct WatchConnectionSettings: View {
         ScrollView {
             VStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "Protocol"))
+                    Text(String(localized: "Protocolo"))
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.kumaGreenLight)
-                    Picker(String(localized: "Protocol"), selection: $selectedProtocol) {
+                        .foregroundStyle(Color.kumaGreenLight)
+                    Picker("", selection: $selectedProtocol) {
                         ForEach(Self.protocols, id: \.self) { proto in
                             Text(proto.uppercased()).tag(proto)
                         }
@@ -699,29 +828,26 @@ struct WatchConnectionSettings: View {
                 .glassCard(glowColor: .kumaGreenDim)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "IP Address"))
+                    Text(String(localized: "Dirección IP"))
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.kumaGreenLight)
-                    HStack(spacing: 2) {
-                        settingsOctetPicker($ipOctet1)
+                        .foregroundStyle(Color.kumaGreenLight)
+                    HStack(spacing: 3) {
+                        OctetButton(value: $ipOctet1)
                         settingsDot
-                        settingsOctetPicker($ipOctet2)
+                        OctetButton(value: $ipOctet2)
                         settingsDot
-                        settingsOctetPicker($ipOctet3)
+                        OctetButton(value: $ipOctet3)
                         settingsDot
-                        settingsOctetPicker($ipOctet4)
+                        OctetButton(value: $ipOctet4)
                     }
-                    Text("\(ipOctet1).\(ipOctet2).\(ipOctet3).\(ipOctet4)")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.kumaGreen)
                 }
                 .glassCard(glowColor: .kumaGreenDim)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "Port"))
+                    Text(String(localized: "Puerto"))
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.kumaGreenLight)
-                    Picker(String(localized: "Port"), selection: $selectedPort) {
+                        .foregroundStyle(Color.kumaGreenLight)
+                    Picker("", selection: $selectedPort) {
                         ForEach(Self.portRange, id: \.self) { port in
                             Text(String(port)).tag(port)
                         }
@@ -730,7 +856,7 @@ struct WatchConnectionSettings: View {
                     .frame(height: 50)
                     Text(":\(selectedPort)")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.kumaGreen)
+                        .foregroundStyle(Color.kumaGreen)
                 }
                 .glassCard(glowColor: .kumaGreenDim)
 
@@ -749,7 +875,7 @@ struct WatchConnectionSettings: View {
                 onDelete()
                 dismiss()
             } label: {
-                Label(String(localized: "Delete Server"), systemImage: "trash")
+                Label(String(localized: "Eliminar servidor"), systemImage: "trash")
                     .font(.system(size: 13, weight: .semibold))
                     .frame(maxWidth: .infinity)
             }
@@ -763,10 +889,19 @@ struct WatchConnectionSettings: View {
     private var saveButton: some View {
         VStack(spacing: 4) {
             if let error = connectError {
-                Text(error)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.appStatusDown)
-                    .lineLimit(3)
+                VStack(spacing: 4) {
+                    Text(error)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.appStatusDown)
+                        .lineLimit(3)
+                    HStack(spacing: 3) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 8))
+                        Text(String(localized: "El Watch debe estar en la misma WiFi que el servidor"))
+                            .font(.system(size: 8))
+                    }
+                    .foregroundStyle(.white.opacity(0.5))
+                }
             }
 
             Button {
@@ -787,23 +922,10 @@ struct WatchConnectionSettings: View {
         }
     }
 
-    private func settingsOctetPicker(_ value: Binding<Int>) -> some View {
-        Picker("", selection: value) {
-            ForEach(0...255, id: \.self) { n in
-                Text(String(n))
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                    .tag(n)
-            }
-        }
-        .pickerStyle(.wheel)
-        .frame(width: 36, height: 50)
-        .clipped()
-    }
-
     private var settingsDot: some View {
         Text(".")
             .font(.system(size: 16, weight: .bold, design: .monospaced))
-            .foregroundStyle(.kumaGreen)
+            .foregroundStyle(Color.kumaGreen)
     }
 
     private var hasMinimumInput: Bool {
@@ -819,7 +941,7 @@ struct WatchConnectionSettings: View {
         guard let baseURL = ServerConnection.validatedBaseURL(from: composedURLString),
               let slug = ServerConnection.validatedStatusPageSlug(from: statusPageSlug)
         else {
-            connectError = String(localized: "Invalid URL")
+            connectError = String(localized: "URL no válida")
             return
         }
 

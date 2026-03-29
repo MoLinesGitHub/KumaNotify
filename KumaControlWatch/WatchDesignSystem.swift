@@ -173,6 +173,80 @@ extension View {
     }
 }
 
+// MARK: - Marquee Text (horizontal scroll banner)
+
+struct MarqueeText: View {
+    let text: String
+    let font: Font
+    let color: Color
+
+    @State private var textWidth: CGFloat = 0
+    @State private var containerWidth: CGFloat = 0
+    @State private var offset: CGFloat = 0
+
+    private let speed: Double = 30
+    private let pauseDuration: Double = 1.5
+    private let gap: CGFloat = 40
+
+    private var needsScroll: Bool { textWidth > containerWidth && containerWidth > 0 }
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            if needsScroll {
+                HStack(spacing: gap) {
+                    marqueeLabel
+                    marqueeLabel
+                }
+                .offset(x: offset)
+            } else {
+                marqueeLabel
+            }
+        }
+        .clipped()
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newWidth in
+            if containerWidth != newWidth {
+                containerWidth = newWidth
+                restartIfNeeded()
+            }
+        }
+    }
+
+    private var marqueeLabel: some View {
+        Text(text)
+            .font(font)
+            .foregroundStyle(color)
+            .fixedSize()
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { newWidth in
+                if textWidth != newWidth {
+                    textWidth = newWidth
+                    restartIfNeeded()
+                }
+            }
+    }
+
+    private func restartIfNeeded() {
+        guard needsScroll else {
+            offset = 0
+            return
+        }
+        offset = 0
+        let scrollDistance = textWidth + gap
+        let duration = scrollDistance / speed
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(Int(pauseDuration * 1000)))
+            guard !Task.isCancelled else { return }
+            withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                offset = -scrollDistance
+            }
+        }
+    }
+}
+
 // MARK: - Status Color Glow Card
 
 struct StatusGlowCard<Content: View>: View {

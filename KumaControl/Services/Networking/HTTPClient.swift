@@ -10,9 +10,15 @@ final class HTTPClient: HTTPClientProtocol, Sendable {
 
     init() {
         let config = URLSessionConfiguration.default
+        #if os(watchOS)
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 30
+        config.waitsForConnectivity = true
+        #else
         config.timeoutIntervalForRequest = 10
         config.timeoutIntervalForResource = 15
         config.waitsForConnectivity = false
+        #endif
         // Bypass iCloud Private Relay / proxy for local network connections
         config.connectionProxyDictionary = [:]
         self.session = URLSession(configuration: config)

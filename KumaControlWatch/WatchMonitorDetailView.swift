@@ -78,8 +78,8 @@ struct WatchMonitorDetailView: View {
                 if let validCert = monitor.validCert {
                     metricCard(
                         icon: validCert ? "lock.shield.fill" : "lock.trianglebadge.exclamationmark.fill",
-                        title: String(localized: "Certificate"),
-                        value: validCert ? String(localized: "Valid") : String(localized: "Invalid"),
+                        title: String(localized: "Certificado"),
+                        value: validCert ? String(localized: "Válido") : String(localized: "No válido"),
                         color: validCert ? .kumaGreen : .appStatusDown,
                         index: 5
                     )
@@ -88,9 +88,9 @@ struct WatchMonitorDetailView: View {
                 if let certDays = monitor.certExpiryDays {
                     metricCard(
                         icon: "calendar.badge.clock",
-                        title: String(localized: "Cert Expiry"),
+                        title: String(localized: "Vencimiento cert."),
                         value: String.localizedStringWithFormat(
-                            String(localized: "%lld days"),
+                            String(localized: "%lld días"),
                             Int64(certDays)
                         ),
                         color: certDays < 30 ? .appStatusDegraded : .kumaGreen,
@@ -100,7 +100,7 @@ struct WatchMonitorDetailView: View {
 
                 // Latest heartbeat section
                 if let hb = latestHeartbeat {
-                    WatchSectionHeader(title: String(localized: "Latest heartbeat"), index: 7)
+                    WatchSectionHeader(title: String(localized: "Último heartbeat"), index: 7)
 
                     detailCard(index: 8) {
                         VStack(alignment: .leading, spacing: 6) {
@@ -121,7 +121,7 @@ struct WatchMonitorDetailView: View {
                                 HStack {
                                     Image(systemName: "bolt.fill")
                                         .font(.system(size: 9))
-                                        .foregroundStyle(.kumaGreen.opacity(0.7))
+                                        .foregroundStyle(Color.kumaGreen.opacity(0.7))
                                     Text("\(ping) ms")
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(.white.opacity(0.6))
@@ -144,10 +144,10 @@ struct WatchMonitorDetailView: View {
                         HStack {
                             Image(systemName: "link")
                                 .font(.system(size: 11))
-                            Text(String(localized: "Open URL"))
+                            Text(String(localized: "Abrir URL"))
                                 .font(.system(size: 12, weight: .medium))
                         }
-                        .foregroundStyle(.kumaGreen)
+                        .foregroundStyle(Color.kumaGreen)
                         .frame(maxWidth: .infinity)
                     }
                     .glassCard(glowColor: .kumaGreenDim)
@@ -233,7 +233,7 @@ struct WatchSectionHeader: View {
         HStack {
             Text(title)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.kumaGreenLight)
+                .foregroundStyle(Color.kumaGreenLight)
                 .textCase(.uppercase)
             Spacer()
         }

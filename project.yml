@@ -119,12 +119,21 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-control.watch
         PRODUCT_NAME: KumaControlWatch
         PRODUCT_MODULE_NAME: KumaControlWatch
-        GENERATE_INFOPLIST_FILE: YES
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_KEY_WKWatchOnly: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: WatchAppIcon
+        INFOPLIST_FILE: KumaControlWatch/Info.plist
         CODE_SIGN_ENTITLEMENTS: KumaControlWatch/KumaControlWatch.entitlements
+    info:
+      path: KumaControlWatch/Info.plist
+      properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        WKApplication: true
+        WKWatchOnly: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     entitlements:
       path: KumaControlWatch/KumaControlWatch.entitlements
       properties:

@@ -21,7 +21,6 @@ struct KumaCheckShape: Shape {
         let w = rect.width
         let h = rect.height
         var path = Path()
-        // Checkmark: M248,325 L288,365 L380,270 (normalized from 622x622)
         let p1 = CGPoint(x: w * 0.399, y: h * 0.523)
         let p2 = CGPoint(x: w * 0.463, y: h * 0.587)
         let p3 = CGPoint(x: w * 0.611, y: h * 0.434)
@@ -39,10 +38,8 @@ struct KumaXShape: Shape {
         let w = rect.width
         let h = rect.height
         var path = Path()
-        // X line 1: M250,260 L372,382
         path.move(to: CGPoint(x: w * 0.402, y: h * 0.418))
         path.addLine(to: CGPoint(x: w * 0.598, y: h * 0.614))
-        // X line 2: M372,260 L250,382
         path.move(to: CGPoint(x: w * 0.598, y: h * 0.418))
         path.addLine(to: CGPoint(x: w * 0.402, y: h * 0.614))
         return path.trimmedPath(from: 0, to: animatableData)
@@ -56,10 +53,8 @@ struct KumaExclamationShape: Shape {
         let w = rect.width
         let h = rect.height
         var path = Path()
-        // Line: M311,246 L311,336
         path.move(to: CGPoint(x: w * 0.50, y: h * 0.396))
         path.addLine(to: CGPoint(x: w * 0.50, y: h * 0.540))
-        // Dot: circle cx=311 cy=384 r=24
         let dotCenter = CGPoint(x: w * 0.50, y: h * 0.617)
         let dotRadius = w * 0.039
         path.move(to: CGPoint(x: dotCenter.x + dotRadius, y: dotCenter.y))
@@ -79,7 +74,6 @@ struct KumaDashShape: Shape {
         let w = rect.width
         let h = rect.height
         var path = Path()
-        // Dash: M245,312 L377,312
         path.move(to: CGPoint(x: w * 0.394, y: h * 0.502))
         path.addLine(to: CGPoint(x: w * 0.606, y: h * 0.502))
         return path.trimmedPath(from: 0, to: animatableData)
@@ -116,7 +110,7 @@ struct WatchSplashView: View {
     @State private var glowIntensity: CGFloat = 0
     @State private var exitScale: CGFloat = 1
     @State private var exitOpacity: CGFloat = 1
-    @State private var hasStartedExit = false
+    @State private var animationComplete = false
 
     private let iconSize: CGFloat = 72
     private let strokeWidth: CGFloat = 5
@@ -127,12 +121,11 @@ struct WatchSplashView: View {
             Color.black.ignoresSafeArea()
 
             ZStack {
-                // Outer rounded rect stroke (draws in)
                 KumaRoundedRect()
                     .trim(from: 0, to: rectTrim)
                     .stroke(
                         LinearGradient(
-                            colors: [.kumaGreenLight, .kumaGreen],
+                            colors: [Color.kumaGreenLight, Color.kumaGreen],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
@@ -140,7 +133,6 @@ struct WatchSplashView: View {
                     )
                     .shadow(color: currentPhase.glowColor.opacity(glowIntensity * 0.5), radius: 8)
 
-                // Icon shapes with crossfade
                 iconStrokeView(KumaDashShape(animatableData: 1), phase: .dash)
                 iconStrokeView(KumaExclamationShape(animatableData: 1), phase: .exclamation)
                 iconStrokeView(KumaXShape(animatableData: 1), phase: .cross)
@@ -151,14 +143,7 @@ struct WatchSplashView: View {
             .opacity(exitOpacity)
         }
         .task {
-            await runAnimation()
-        }
-        .onChange(of: isDataLoaded) { _, loaded in
-            if loaded && !hasStartedExit {
-                Task {
-                    await skipToCheckAndExit()
-                }
-            }
+            await runFullAnimation()
         }
     }
 
@@ -179,27 +164,21 @@ struct WatchSplashView: View {
             )
     }
 
-    private func runAnimation() async {
+    private func runFullAnimation() async {
         // Phase 1: Draw the rounded rect
         withAnimation(.easeOut(duration: 0.6)) {
             rectTrim = 1.0
         }
-        try? await Task.sleep(for: .milliseconds(500))
+        try? await Task.sleep(for: .milliseconds(650))
 
-        // Phase 2: Cycle through icons
-        let phases: [SplashIconPhase] = [.dash, .exclamation, .cross]
-
-        for phase in phases {
-            guard !hasStartedExit else { return }
-
+        // Phase 2: Cycle through icons dash → ! → X
+        for phase: SplashIconPhase in [.dash, .exclamation, .cross] {
             currentPhase = phase
             withAnimation(.easeIn(duration: 0.25)) {
                 iconOpacity = 1
                 glowIntensity = 1
             }
-            try? await Task.sleep(for: .milliseconds(550))
-
-            guard !hasStartedExit else { return }
+            try? await Task.sleep(for: .milliseconds(500))
 
             withAnimation(.easeOut(duration: 0.2)) {
                 iconOpacity = 0
@@ -208,28 +187,23 @@ struct WatchSplashView: View {
             try? await Task.sleep(for: .milliseconds(200))
         }
 
-        // Final: land on checkmark (even if data not loaded yet, wait max 3s)
-        await skipToCheckAndExit()
-    }
-
-    private func skipToCheckAndExit() async {
-        guard !hasStartedExit else { return }
-        hasStartedExit = true
-
+        // Phase 3: Land on checkmark
         currentPhase = .check
         withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
             iconOpacity = 1
             glowIntensity = 1
         }
 
-        // Wait for data if not ready (max 2s extra)
+        // Wait for data if not ready (max 3s extra)
         if !isDataLoaded {
-            try? await Task.sleep(for: .seconds(2))
-        } else {
-            try? await Task.sleep(for: .milliseconds(600))
+            for _ in 0..<30 {
+                try? await Task.sleep(for: .milliseconds(100))
+                if isDataLoaded { break }
+            }
         }
+        try? await Task.sleep(for: .milliseconds(500))
 
-        // Exit animation
+        // Phase 4: Exit
         withAnimation(.easeIn(duration: 0.35)) {
             exitScale = 0.6
             exitOpacity = 0
