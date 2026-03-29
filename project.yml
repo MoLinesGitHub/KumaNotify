@@ -1,4 +1,4 @@
-name: Kuma Notify
+name: Kuma Control
 options:
   bundleIdPrefix: com.molinesdesigns
   deploymentTarget:
@@ -31,25 +31,25 @@ configs:
   Release: release
 
 targets:
-  KumaNotify:
+  KumaControl:
     type: application
     platform: macOS
     sources:
-      - path: KumaNotify
-      - path: KumaNotifyShared
-      - path: KumaNotifyIntents
+      - path: KumaControl
+      - path: KumaControlShared
+      - path: KumaControlIntents
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify
-        PRODUCT_NAME: Kuma Notify
-        PRODUCT_MODULE_NAME: KumaNotify
-        INFOPLIST_FILE: KumaNotify/Info.plist
-        CODE_SIGN_ENTITLEMENTS: KumaNotify/Entitlements/KumaNotify.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-control
+        PRODUCT_NAME: Kuma Control
+        PRODUCT_MODULE_NAME: KumaControl
+        INFOPLIST_FILE: KumaControl/Info.plist
+        CODE_SIGN_ENTITLEMENTS: KumaControl/Entitlements/KumaControl.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
-      path: KumaNotify/Info.plist
+      path: KumaControl/Info.plist
       properties:
-        CFBundleDisplayName: Kuma Notify
+        CFBundleDisplayName: Kuma Control
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
         LSUIElement: true
@@ -57,132 +57,132 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
     entitlements:
-      path: KumaNotify/Entitlements/KumaNotify.entitlements
+      path: KumaControl/Entitlements/KumaControl.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.application-groups:
-          - group.com.molinesdesigns.kuma-notify
+          - group.com.molinesdesigns.kuma-control
     dependencies:
-      - target: KumaNotifyWidget
+      - target: KumaControlWidget
         embed: true
         codeSign: true
         copy:
           destination: plugins
     scheme:
       testTargets:
-        - KumaNotifyTests
-        - KumaNotifyUITests
+        - KumaControlTests
+        - KumaControlUITests
 
-  KumaNotifyWidget:
+  KumaControlWidget:
     type: app-extension
     platform: macOS
     sources:
-      - path: KumaNotifyWidget
-      - path: KumaNotifyShared
-      - path: KumaNotify/Resources/Assets.xcassets
-      - path: KumaNotify/Resources/Localizable.xcstrings
+      - path: KumaControlWidget
+      - path: KumaControlShared
+      - path: KumaControl/Resources/Assets.xcassets
+      - path: KumaControl/Resources/Localizable.xcstrings
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.widget
-        PRODUCT_NAME: KumaNotifyWidget
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-control.widget
+        PRODUCT_NAME: KumaControlWidget
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks"
     entitlements:
-      path: KumaNotifyWidget/KumaNotifyWidget.entitlements
+      path: KumaControlWidget/KumaControlWidget.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
-          - group.com.molinesdesigns.kuma-notify
+          - group.com.molinesdesigns.kuma-control
 
-  KumaNotifyWatch:
+  KumaControlWatch:
     type: application
     platform: watchOS
     sources:
-      - path: KumaNotifyWatch
-      - path: KumaNotifyShared
-      - path: KumaNotify/Resources/Localizable.xcstrings
-      - path: KumaNotifyWatch/Resources/Assets.xcassets
-      - path: KumaNotify/Models/Domain/HeartbeatRepresentable.swift
-      - path: KumaNotify/Models/Domain/MonitorGroupRepresentable.swift
-      - path: KumaNotify/Models/Domain/MonitorRepresentable.swift
-      - path: KumaNotify/Models/Domain/MonitorStatus.swift
-      - path: KumaNotify/Models/Domain/ServerConnection.swift
-      - path: KumaNotify/Models/UptimeKuma
-      - path: KumaNotify/Services/Monitoring
-      - path: KumaNotify/Services/Networking/APIError.swift
-      - path: KumaNotify/Services/Networking/HTTPClient.swift
-      - path: KumaNotify/Services/UptimeKuma
+      - path: KumaControlWatch
+      - path: KumaControlShared
+      - path: KumaControl/Resources/Localizable.xcstrings
+      - path: KumaControlWatch/Resources/Assets.xcassets
+      - path: KumaControl/Models/Domain/HeartbeatRepresentable.swift
+      - path: KumaControl/Models/Domain/MonitorGroupRepresentable.swift
+      - path: KumaControl/Models/Domain/MonitorRepresentable.swift
+      - path: KumaControl/Models/Domain/MonitorStatus.swift
+      - path: KumaControl/Models/Domain/ServerConnection.swift
+      - path: KumaControl/Models/UptimeKuma
+      - path: KumaControl/Services/Monitoring
+      - path: KumaControl/Services/Networking/APIError.swift
+      - path: KumaControl/Services/Networking/HTTPClient.swift
+      - path: KumaControl/Services/UptimeKuma
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.watch
-        PRODUCT_NAME: KumaNotifyWatch
-        PRODUCT_MODULE_NAME: KumaNotifyWatch
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-control.watch
+        PRODUCT_NAME: KumaControlWatch
+        PRODUCT_MODULE_NAME: KumaControlWatch
         GENERATE_INFOPLIST_FILE: YES
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_KEY_WKWatchOnly: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: WatchAppIcon
-        CODE_SIGN_ENTITLEMENTS: KumaNotifyWatch/KumaNotifyWatch.entitlements
+        CODE_SIGN_ENTITLEMENTS: KumaControlWatch/KumaControlWatch.entitlements
     entitlements:
-      path: KumaNotifyWatch/KumaNotifyWatch.entitlements
+      path: KumaControlWatch/KumaControlWatch.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.molinesdesigns.kuma-notify
+          - group.com.molinesdesigns.kuma-control
     dependencies:
-      - target: KumaNotifyWatchWidget
+      - target: KumaControlWatchWidget
         embed: true
         codeSign: true
         copy:
           destination: plugins
 
-  KumaNotifyWatchWidget:
+  KumaControlWatchWidget:
     type: app-extension
     platform: watchOS
     sources:
-      - path: KumaNotifyWatchWidget
-      - path: KumaNotifyShared
-      - path: KumaNotifyWatch/Resources/Assets.xcassets
-      - path: KumaNotify/Resources/Localizable.xcstrings
+      - path: KumaControlWatchWidget
+      - path: KumaControlShared
+      - path: KumaControlWatch/Resources/Assets.xcassets
+      - path: KumaControl/Resources/Localizable.xcstrings
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.watch.widget
-        PRODUCT_NAME: KumaNotifyWatchWidget
-        PRODUCT_MODULE_NAME: KumaNotifyWatchWidget
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-control.watch.widget
+        PRODUCT_NAME: KumaControlWatchWidget
+        PRODUCT_MODULE_NAME: KumaControlWatchWidget
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_FILE: KumaNotifyWatchWidget/Info.plist
+        INFOPLIST_FILE: KumaControlWatchWidget/Info.plist
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
-        CODE_SIGN_ENTITLEMENTS: KumaNotifyWatchWidget/KumaNotifyWatchWidget.entitlements
+        CODE_SIGN_ENTITLEMENTS: KumaControlWatchWidget/KumaControlWatchWidget.entitlements
     entitlements:
-      path: KumaNotifyWatchWidget/KumaNotifyWatchWidget.entitlements
+      path: KumaControlWatchWidget/KumaControlWatchWidget.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.molinesdesigns.kuma-notify
+          - group.com.molinesdesigns.kuma-control
 
-  KumaNotifyTests:
+  KumaControlTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: KumaNotifyTests
+      - path: KumaControlTests
     dependencies:
-      - target: KumaNotify
+      - target: KumaControl
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.tests
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Kuma Notify.app/Contents/MacOS/Kuma Notify"
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-control.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Kuma Control.app/Contents/MacOS/Kuma Control"
         BUNDLE_LOADER: "$(TEST_HOST)"
         GENERATE_INFOPLIST_FILE: YES
 
-  KumaNotifyUITests:
+  KumaControlUITests:
     type: bundle.ui-testing
     platform: macOS
     sources:
-      - path: KumaNotifyUITests
+      - path: KumaControlUITests
     dependencies:
-      - target: KumaNotify
+      - target: KumaControl
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-notify.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.molinesdesigns.kuma-control.uitests
         GENERATE_INFOPLIST_FILE: YES

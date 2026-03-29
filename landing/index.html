@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kuma Control — Your servers, always in sight</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-deep: #06080d;
+  --bg-surface: #0c1019;
+  --bg-card: #111822;
+  --bg-card-hover: #162030;
+  --green: #00e87b;
+  --green-dim: #00e87b33;
+  --green-glow: #00e87b55;
+  --red: #ff4060;
+  --red-dim: #ff406033;
+  --red-glow: #ff406055;
+  --amber: #ffb020;
+  --amber-dim: #ffb02033;
+  --cyan: #38d9f5;
+  --text-primary: #e8ecf4;
+  --text-secondary: #6b7a92;
+  --text-dim: #3a4556;
+  --border: #1a2233;
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-mono);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── GRID BACKGROUND ── */
+.grid-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    radial-gradient(circle at 50% 0%, #0d1f3a 0%, transparent 60%),
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 100% 100%, 60px 60px, 60px 60px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.grid-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 800px 400px at 50% 20%, var(--green-dim), transparent);
+  animation: grid-pulse 6s ease-in-out infinite alternate;
+}
+
+@keyframes grid-pulse {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.7; }
+}
+
+/* ── SCANLINE OVERLAY ── */
+.scanline {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 232, 123, 0.015) 2px,
+    rgba(0, 232, 123, 0.015) 4px
+  );
+}
+
+/* ── LAYOUT ── */
+section { position: relative; z-index: 2; }
+
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 16px 0;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  background: rgba(6, 8, 13, 0.7);
+  border-bottom: 1px solid var(--border);
+  transition: all 0.3s;
+}
+
+nav .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.nav-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--green), #00b85f);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bg-deep);
+  font-family: var(--font-display);
+  box-shadow: 0 0 20px var(--green-dim);
+}
+
+.nav-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.nav-links {
+  display: flex;
+  gap: 32px;
+  list-style: none;
+}
+
+.nav-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 0.2s;
+  letter-spacing: 0.02em;
+}
+
+.nav-links a:hover { color: var(--green); }
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding-top: 80px;
+}
+
+.hero-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 6px 16px 6px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+  opacity: 0;
+  animation: fade-up 0.8s 0.2s forwards;
+}
+
+.badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green-glow);
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 4px var(--green-dim); }
+  50% { box-shadow: 0 0 12px var(--green-glow), 0 0 24px var(--green-dim); }
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fade-up 0.8s 0.35s forwards;
+}
+
+.hero h1 .accent {
+  background: linear-gradient(135deg, var(--green), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-width: 440px;
+  margin-bottom: 36px;
+  opacity: 0;
+  animation: fade-up 0.8s 0.5s forwards;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  opacity: 0;
+  animation: fade-up 0.8s 0.65s forwards;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--green);
+  color: var(--bg-deep);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 0 30px var(--green-dim);
+  letter-spacing: 0.02em;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 40px var(--green-glow), 0 8px 30px rgba(0,0,0,0.4);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.25s;
+  letter-spacing: 0.02em;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-dim);
+  transform: translateY(-2px);
+}
+
+/* ── LIVE MONITOR PANEL (hero right) ── */
+.monitor-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 80px rgba(0,0,0,0.5), 0 0 60px var(--green-dim);
+  opacity: 0;
+  animation: fade-scale 1s 0.4s forwards;
+}
+
+@keyframes fade-scale {
+  from { opacity: 0; transform: scale(0.95) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.panel-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.panel-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.panel-dots span:nth-child(1) { background: #ff5f57; }
+.panel-dots span:nth-child(2) { background: #ffbd2e; }
+.panel-dots span:nth-child(3) { background: #28ca42; }
+
+.panel-titlebar-text {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
+.panel-body { padding: 20px; }
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.panel-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-indicator.up {
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green-glow);
+  animation: pulse-dot 2s infinite;
+}
+
+.status-indicator.down {
+  background: var(--red);
+  box-shadow: 0 0 10px var(--red-glow);
+  animation: pulse-dot 1.2s infinite;
+}
+
+.status-indicator.degraded {
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber-dim);
+}
+
+.status-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.panel-count {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.monitor-list { display: flex; flex-direction: column; gap: 6px; }
+
+.monitor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: all 0.3s;
+  opacity: 0;
+  animation: row-in 0.5s forwards;
+}
+
+.monitor-row:nth-child(1) { animation-delay: 0.7s; }
+.monitor-row:nth-child(2) { animation-delay: 0.85s; }
+.monitor-row:nth-child(3) { animation-delay: 1.0s; }
+.monitor-row:nth-child(4) { animation-delay: 1.15s; }
+.monitor-row:nth-child(5) { animation-delay: 1.3s; }
+.monitor-row:nth-child(6) { animation-delay: 1.45s; }
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.monitor-row:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border);
+}
+
+.monitor-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.monitor-dot.up { background: var(--green); box-shadow: 0 0 6px var(--green-dim); }
+.monitor-dot.down { background: var(--red); box-shadow: 0 0 6px var(--red-dim); }
+.monitor-dot.degraded { background: var(--amber); }
+
+.monitor-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monitor-ping {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-uptime {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-uptime.good {
+  background: var(--green-dim);
+  color: var(--green);
+}
+
+.monitor-uptime.warn {
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+
+.monitor-uptime.bad {
+  background: var(--red-dim);
+  color: var(--red);
+}
+
+/* ── MENU BAR MOCKUP ── */
+.menubar-strip {
+  margin-top: 16px;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  opacity: 0;
+  animation: fade-up 0.6s 1.6s forwards;
+}
+
+.menubar-icon {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--green);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.menubar-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── FEATURES ── */
+.features {
+  padding: 140px 0;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--green);
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(28px, 3.5vw, 40px);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.section-desc {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-width: 500px;
+  margin-bottom: 60px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.feature-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  transition: all 0.35s;
+  position: relative;
+  overflow: hidden;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--green-dim), transparent);
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+
+.feature-card:hover {
+  border-color: var(--green-dim);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+}
+
+.feature-card:hover::before { opacity: 1; }
+
+.feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  margin-bottom: 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.feature-card h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.feature-card p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+/* ── PLATFORMS ── */
+.platforms {
+  padding: 100px 0 140px;
+}
+
+.platform-showcase {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-top: 60px;
+}
+
+.platform-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.platform-card::after {
+  content: '';
+  position: absolute;
+  bottom: -60px;
+  right: -60px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.platform-card.macos::after { background: var(--green); }
+.platform-card.watchos::after { background: var(--cyan); }
+
+.platform-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.platform-card.macos .platform-tag {
+  background: var(--green-dim);
+  color: var(--green);
+}
+
+.platform-card.watchos .platform-tag {
+  background: rgba(56, 217, 245, 0.15);
+  color: var(--cyan);
+}
+
+.platform-card h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+
+.platform-card p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.platform-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.platform-features li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.platform-features li::before {
+  content: '>';
+  color: var(--green);
+  font-weight: 700;
+}
+
+/* ── TERMINAL SECTION ── */
+.terminal-section {
+  padding: 100px 0;
+}
+
+.terminal-window {
+  max-width: 720px;
+  margin: 40px auto 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.terminal-bar .panel-dots span { width: 8px; height: 8px; }
+
+.terminal-bar-title {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.terminal-body {
+  padding: 20px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--text-secondary);
+}
+
+.terminal-line { display: flex; gap: 8px; }
+.terminal-prompt { color: var(--green); font-weight: 600; white-space: nowrap; }
+.terminal-cmd { color: var(--text-primary); }
+.terminal-output { color: var(--text-dim); padding-left: 20px; }
+.terminal-success { color: var(--green); }
+.terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--green);
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* ── PRICING ── */
+.pricing {
+  padding: 100px 0 140px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 700px;
+  margin: 50px auto 0;
+}
+
+.price-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 36px;
+  position: relative;
+  transition: all 0.3s;
+}
+
+.price-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+
+.price-card.pro {
+  border-color: var(--green-dim);
+  background: linear-gradient(170deg, var(--bg-surface), rgba(0, 232, 123, 0.04));
+}
+
+.price-card.pro::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+  border-radius: 14px 14px 0 0;
+}
+
+.price-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.price-amount {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin-bottom: 4px;
+}
+
+.price-card.pro .price-amount {
+  background: linear-gradient(135deg, var(--green), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.price-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+
+.price-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.price-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.price-features li::before {
+  content: '+';
+  color: var(--green);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── FOOTER ── */
+footer {
+  padding: 40px 0;
+  border-top: 1px solid var(--border);
+}
+
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-left {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.footer-right {
+  display: flex;
+  gap: 24px;
+}
+
+.footer-right a {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-right a:hover { color: var(--text-secondary); }
+
+/* ── CTA SECTION ── */
+.cta {
+  padding: 120px 0;
+  text-align: center;
+}
+
+.cta-glow {
+  position: relative;
+}
+
+.cta-glow::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 300px;
+  background: radial-gradient(ellipse, var(--green-dim), transparent);
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.cta h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(28px, 4vw, 44px);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.cta p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 36px;
+  position: relative;
+}
+
+.cta .hero-actions {
+  justify-content: center;
+  position: relative;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-showcase {
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-links { display: none; }
+}
+
+@media (max-width: 600px) {
+  .hero-actions { flex-direction: column; }
+  .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
+}
+
+/* ── HEARTBEAT BAR ── */
+.heartbeat-bar {
+  display: flex;
+  gap: 2px;
+  margin-top: 12px;
+}
+
+.heartbeat-bar span {
+  flex: 1;
+  height: 18px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: bar-in 0.3s forwards;
+}
+
+.heartbeat-bar span.up { background: var(--green); opacity: 0.7; }
+.heartbeat-bar span.down { background: var(--red); }
+.heartbeat-bar span.none { background: var(--text-dim); opacity: 0.15; }
+
+@keyframes bar-in {
+  from { opacity: 0; transform: scaleY(0.3); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="scanline"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <a href="#" class="nav-brand">
+      <div class="nav-logo">K</div>
+      <span class="nav-title">Kuma Control</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#platforms">Platforms</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#download">Download</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-inner">
+      <div>
+        <div class="hero-badge">
+          <span class="badge-dot"></span>
+          All systems operational
+        </div>
+        <h1>Your servers,<br>always <span class="accent">in sight</span></h1>
+        <p class="hero-sub">Native macOS menu bar client for Uptime Kuma. Real-time monitoring, instant notifications, zero friction. Now on Apple Watch.</p>
+        <div class="hero-actions">
+          <a href="#download" class="btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download for Mac
+          </a>
+          <a href="#features" class="btn-secondary">See features</a>
+        </div>
+      </div>
+
+      <!-- LIVE PANEL -->
+      <div class="monitor-panel">
+        <div class="panel-titlebar">
+          <div class="panel-dots"><span></span><span></span><span></span></div>
+          <span class="panel-titlebar-text">Kuma Control &mdash; Status Page</span>
+        </div>
+        <div class="panel-body">
+          <div class="panel-header">
+            <div class="panel-status">
+              <span class="status-indicator up"></span>
+              <span class="status-text">All Up</span>
+            </div>
+            <span class="panel-count">6/6 online</span>
+          </div>
+          <div class="monitor-list">
+            <div class="monitor-row">
+              <span class="monitor-dot up"></span>
+              <span class="monitor-name">api.production</span>
+              <span class="monitor-ping">12ms</span>
+              <span class="monitor-uptime good">99.98%</span>
+            </div>
+            <div class="monitor-row">
+              <span class="monitor-dot up"></span>
+              <span class="monitor-name">web.frontend</span>
+              <span class="monitor-ping">24ms</span>
+              <span class="monitor-uptime good">100%</span>
+            </div>
+            <div class="monitor-row">
+              <span class="monitor-dot up"></span>
+              <span class="monitor-name">db.postgres-main</span>
+              <span class="monitor-ping">3ms</span>
+              <span class="monitor-uptime good">99.99%</span>
+            </div>
+            <div class="monitor-row">
+              <span class="monitor-dot up"></span>
+              <span class="monitor-name">cache.redis</span>
+              <span class="monitor-ping">1ms</span>
+              <span class="monitor-uptime good">100%</span>
+            </div>
+            <div class="monitor-row">
+              <span class="monitor-dot degraded"></span>
+              <span class="monitor-name">cdn.assets</span>
+              <span class="monitor-ping">540ms</span>
+              <span class="monitor-uptime warn">98.7%</span>
+            </div>
+            <div class="monitor-row">
+              <span class="monitor-dot up"></span>
+              <span class="monitor-name">mail.smtp</span>
+              <span class="monitor-ping">89ms</span>
+              <span class="monitor-uptime good">99.95%</span>
+            </div>
+          </div>
+          <div class="heartbeat-bar" id="heartbeat"></div>
+          <div class="menubar-strip">
+            <span>Wed 14:32</span>
+            <span class="menubar-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M2 12a10 10 0 0018 0"/><path d="M5 12a7 7 0 0014 0"/><path d="M8 12a4 4 0 008 0"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+              6/6
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">Features</div>
+      <h2 class="section-title">Built for the way<br>you work</h2>
+      <p class="section-desc">A native monitoring experience that lives in your menu bar. No browser tabs, no electron wrappers. Pure Swift performance.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M2 12a10 10 0 0018 0"/><path d="M5 12a7 7 0 0014 0"/><circle cx="12" cy="12" r="1" fill="var(--green)"/></svg>
+        </div>
+        <h3>Menu Bar Native</h3>
+        <p>Lives quietly in your menu bar. Three icon styles: SF Symbol with pulse animation, color dot, or count badge. Glanceable status at all times.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        </div>
+        <h3>Smart Notifications</h3>
+        <p>Instant alerts when services go down. Recovery notifications with downtime duration. Certificate expiry warnings before it's too late.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <h3>Multiple Servers</h3>
+        <p>Monitor multiple Uptime Kuma instances from a single app. Switch between status pages or view them all at once in the dashboard.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3>Incident History</h3>
+        <p>Local persistence of every state transition. Browse past incidents with timestamps and durations. Auto-purge after 90 days.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <h3>Privacy First</h3>
+        <p>No data collected. No analytics. No cloud sync. All monitoring data stays on your device. Connects only to your configured servers.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <h3>Battery Aware</h3>
+        <p>Adaptive polling that reduces frequency on battery power. Smart backoff when your Mac is sleeping. Zero impact on battery life.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORMS -->
+<section class="platforms" id="platforms">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">Platforms</div>
+      <h2 class="section-title">One ecosystem,<br>every wrist and desk</h2>
+      <p class="section-desc">Native on every Apple platform that matters. Built with SwiftUI and WidgetKit for a seamless experience across devices.</p>
+    </div>
+    <div class="platform-showcase">
+      <div class="platform-card macos reveal">
+        <span class="platform-tag">macOS 14+</span>
+        <h3>Menu Bar Powerhouse</h3>
+        <p>A full monitoring dashboard that drops down from your menu bar. Complex UI in a compact window, no Dock icon needed.</p>
+        <ul class="platform-features">
+          <li>MenuBarExtra with .window style</li>
+          <li>Three configurable icon styles</li>
+          <li>WidgetKit desktop widgets</li>
+          <li>Siri Shortcuts integration</li>
+          <li>Launch at login</li>
+          <li>Do Not Disturb schedule</li>
+          <li>Export & share reports</li>
+        </ul>
+      </div>
+      <div class="platform-card watchos reveal">
+        <span class="platform-tag">watchOS 11+</span>
+        <h3>Glance at Your Wrist</h3>
+        <p>Complications for every watch face. Inline, circular, corner, and rectangular widgets. Full dashboard with monitor details.</p>
+        <ul class="platform-features">
+          <li>Four complication families</li>
+          <li>Standalone watch app</li>
+          <li>Digital Crown navigation</li>
+          <li>Server config on-device</li>
+          <li>Incident & maintenance view</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TERMINAL -->
+<section class="terminal-section reveal">
+  <div class="container">
+    <div style="text-align:center">
+      <div class="section-label">How it works</div>
+      <h2 class="section-title">Point it at your Kuma instance</h2>
+      <p class="section-desc" style="margin: 12px auto 0">No API key. No authentication. Just your status page URL and slug. The app reads the public API endpoints that Uptime Kuma exposes.</p>
+    </div>
+    <div class="terminal-window">
+      <div class="terminal-bar">
+        <div class="panel-dots"><span></span><span></span><span></span></div>
+        <span class="terminal-bar-title">Connection</span>
+      </div>
+      <div class="terminal-body">
+        <div class="terminal-line"><span class="terminal-prompt">server</span> <span class="terminal-cmd">http://192.168.1.33:3001</span></div>
+        <div class="terminal-line"><span class="terminal-prompt">slug&nbsp;&nbsp;</span> <span class="terminal-cmd">home-lab</span></div>
+        <div class="terminal-output">&nbsp;</div>
+        <div class="terminal-line"><span class="terminal-prompt">&gt;</span> <span class="terminal-cmd">GET /api/status-page/home-lab</span></div>
+        <div class="terminal-output terminal-success">&#10003; 200 OK &mdash; 6 monitors, 2 groups</div>
+        <div class="terminal-line"><span class="terminal-prompt">&gt;</span> <span class="terminal-cmd">GET /api/status-page/heartbeat/home-lab</span></div>
+        <div class="terminal-output terminal-success">&#10003; 200 OK &mdash; 144 heartbeats loaded</div>
+        <div class="terminal-output">&nbsp;</div>
+        <div class="terminal-output" style="color: var(--green)">Connection validated. Polling every 30s.<span class="terminal-cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="container">
+    <div class="reveal" style="text-align:center">
+      <div class="section-label">Pricing</div>
+      <h2 class="section-title">Free forever. Pro when<br>you need it.</h2>
+      <p class="section-desc" style="margin: 12px auto 0">One-time purchase. No subscriptions. No recurring fees.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="price-card reveal">
+        <div class="price-label">Basic</div>
+        <div class="price-amount">Free</div>
+        <div class="price-note">Always free, no limits</div>
+        <ul class="price-features">
+          <li>Single server monitoring</li>
+          <li>Menu bar status icon</li>
+          <li>Down/recovery notifications</li>
+          <li>Incident history</li>
+          <li>macOS desktop widget</li>
+          <li>Apple Watch app & complications</li>
+        </ul>
+      </div>
+      <div class="price-card pro reveal">
+        <div class="price-label">Pro</div>
+        <div class="price-amount">&euro;6.99</div>
+        <div class="price-note">One-time purchase, lifetime</div>
+        <ul class="price-features">
+          <li>Everything in Basic</li>
+          <li>Multiple servers</li>
+          <li>Certificate expiry alerts</li>
+          <li>Do Not Disturb schedule</li>
+          <li>Acknowledge incidents</li>
+          <li>Export & share reports</li>
+          <li>Battery saver mode</li>
+          <li>Siri Shortcuts</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="download">
+  <div class="container">
+    <div class="cta-glow reveal">
+      <h2>Start monitoring<br>in <span class="accent" style="background: linear-gradient(135deg, var(--green), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">30 seconds</span></h2>
+      <p>Download Kuma Control, enter your server URL, and you're done.</p>
+      <div class="hero-actions">
+        <a href="#" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          Download on the Mac App Store
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        &copy; 2026 Molines Designs. Built with care in Valencia.
+      </div>
+      <div class="footer-right">
+        <a href="#">Privacy</a>
+        <a href="#">Support</a>
+        <a href="#">GitHub</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Heartbeat bar generation
+const bar = document.getElementById('heartbeat');
+const states = ['up','up','up','up','up','up','up','up','down','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up','up'];
+states.forEach((s, i) => {
+  const span = document.createElement('span');
+  span.className = s;
+  span.style.animationDelay = `${1.5 + i * 0.03}s`;
+  bar.appendChild(span);
+});
+
+// Scroll reveal
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+reveals.forEach(el => observer.observe(el));
+
+// Stagger feature cards
+document.querySelectorAll('.feature-card').forEach((card, i) => {
+  card.style.transitionDelay = `${i * 0.08}s`;
+});
+</script>
+
+</body>
+</html>
