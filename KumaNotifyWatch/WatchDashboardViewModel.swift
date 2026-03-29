@@ -193,9 +193,6 @@ final class WatchDashboardViewModel {
             if let latestPing = monitor.latestPing, latestPing > AppConstants.degradedPingThreshold {
                 return true
             }
-            if let uptime24h = monitor.uptime24h, uptime24h < AppConstants.degradedUptimeThreshold {
-                return true
-            }
             if let certExpiryDays = monitor.certExpiryDays, certExpiryDays < AppConstants.certExpiryWarningDays {
                 return true
             }

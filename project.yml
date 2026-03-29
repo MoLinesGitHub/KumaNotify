@@ -120,6 +120,9 @@ targets:
         PRODUCT_NAME: KumaNotifyWatch
         PRODUCT_MODULE_NAME: KumaNotifyWatch
         GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_KEY_WKWatchOnly: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: WatchAppIcon
         CODE_SIGN_ENTITLEMENTS: KumaNotifyWatch/KumaNotifyWatch.entitlements
     entitlements:
@@ -148,7 +151,9 @@ targets:
         PRODUCT_NAME: KumaNotifyWatchWidget
         PRODUCT_MODULE_NAME: KumaNotifyWatchWidget
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        INFOPLIST_FILE: KumaNotifyWatchWidget/Info.plist
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_ENTITLEMENTS: KumaNotifyWatchWidget/KumaNotifyWatchWidget.entitlements
     entitlements:
       path: KumaNotifyWatchWidget/KumaNotifyWatchWidget.entitlements

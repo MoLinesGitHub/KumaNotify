@@ -1,15 +1,18 @@
 {
   "images" : [
     {
-      "filename" : "MenuBarIconUp.svg",
-      "idiom" : "mac"
+      "filename" : "MenuBarIconUp@1x.png",
+      "idiom" : "mac",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "MenuBarIconUp@2x.png",
+      "idiom" : "mac",
+      "scale" : "2x"
     }
   ],
   "info" : {
     "author" : "xcode",
     "version" : 1
-  },
-  "properties" : {
-    "preserves-vector-representation" : true
   }
 }

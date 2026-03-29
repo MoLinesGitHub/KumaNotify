@@ -1,15 +1,18 @@
 {
   "images" : [
     {
-      "filename" : "MenuBarIconOffline.svg",
-      "idiom" : "mac"
+      "filename" : "MenuBarIconOffline@1x.png",
+      "idiom" : "mac",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "MenuBarIconOffline@2x.png",
+      "idiom" : "mac",
+      "scale" : "2x"
     }
   ],
   "info" : {
     "author" : "xcode",
     "version" : 1
-  },
-  "properties" : {
-    "preserves-vector-representation" : true
   }
 }

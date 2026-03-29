@@ -11,7 +11,6 @@ enum AppConstants {
     static let minimumPollingPro: TimeInterval = 10
     static let maximumPollingInterval: TimeInterval = 300
     static let degradedPingThreshold = 500
-    static let degradedUptimeThreshold = 0.99
     static let certExpiryWarningDays = 30
     static let downAlertSoundCooldown: TimeInterval = 30
     static let incidentRetentionDays = 90

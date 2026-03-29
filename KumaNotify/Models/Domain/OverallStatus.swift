@@ -8,7 +8,6 @@ enum OverallStatus: Sendable {
 
     enum DegradedReason: Sendable {
         case highPing(monitorName: String, pingMs: Int)
-        case lowUptime(monitorName: String, uptimePercent: Double)
         case certExpiringSoon(monitorName: String, daysRemaining: Int)
     }
 

@@ -98,7 +98,11 @@ final class MenuBarViewModel {
     }
 
     func refreshPollingInterval() {
+        #if DEBUG
+        let isPro = storeManager?.effectiveProUnlocked ?? false
+        #else
         let isPro = storeManager?.proUnlocked ?? false
+        #endif
         pollingEngine.interval = settingsStore.effectivePollingInterval(
             isPro: isPro,
             isOnBattery: powerMonitor.isOnBattery,
@@ -380,9 +384,6 @@ final class MenuBarViewModel {
         for monitor in monitors {
             if let ping = monitor.latestPing, ping > AppConstants.degradedPingThreshold {
                 return .highPing(monitorName: monitor.name, pingMs: ping)
-            }
-            if let uptime = monitor.uptime24h, uptime < AppConstants.degradedUptimeThreshold {
-                return .lowUptime(monitorName: monitor.name, uptimePercent: uptime)
             }
             if let days = monitor.certExpiryDays, days < AppConstants.certExpiryWarningDays {
                 return .certExpiringSoon(monitorName: monitor.name, daysRemaining: days)
