@@ -5,28 +5,29 @@ struct WatchRootView: View {
     @Bindable var viewModel: WatchDashboardViewModel
 
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showSplash = true
     @State private var isShowingSettings = false
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let connection = configurationStore.connection {
-                    dashboard(connection: connection)
-                } else {
-                    WatchConnectionForm(
-                        initialConnection: nil,
-                        onSave: handleSave(connection:)
-                    )
+        ZStack {
+            if showSplash, configurationStore.connection != nil {
+                WatchSplashView(
+                    isDataLoaded: viewModel.result != nil || viewModel.errorMessage != nil
+                ) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        showSplash = false
+                    }
                 }
+            } else {
+                mainContent
             }
-            .navigationTitle(String(localized: "Server"))
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active,
                   let connection = configurationStore.connection,
-                  !isShowingSettings
+                  !isShowingSettings,
+                  !showSplash
             else { return }
-
             Task {
                 await viewModel.refresh(connection: connection)
             }
@@ -34,166 +35,24 @@ struct WatchRootView: View {
     }
 
     @ViewBuilder
-    private func dashboard(connection: ServerConnection) -> some View {
-        let summary = viewModel.summary
-
-        List {
-            Section {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(summary.color)
-                        .frame(width: 10, height: 10)
-                    Text(summary.label)
-                        .font(.headline)
-                }
-
-                if summary.totalCount > 0 {
-                    Text(WidgetData.monitorSummaryLine(
-                        upCount: summary.upCount,
-                        totalCount: summary.totalCount
-                    ))
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                }
-
-                if let title = viewModel.result?.title, !title.isEmpty {
-                    Text(title)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(connection.name)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(.caption2)
-                        .foregroundStyle(.red)
-                }
-
-                if let lastRefreshDate = viewModel.lastRefreshDate {
-                    Text(lastRefreshDate, format: .relative(presentation: .named))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if !viewModel.monitors.isEmpty {
-                Section {
-                    ForEach(viewModel.monitors.prefix(12)) { monitor in
-                        NavigationLink {
-                            WatchMonitorDetailView(
-                                monitor: monitor,
-                                latestHeartbeat: viewModel.latestHeartbeat(for: monitor.id)
-                            )
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: monitor.currentStatus.sfSymbol)
-                                    .foregroundStyle(monitor.currentStatus.color)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(monitor.name)
-                                        .lineLimit(1)
-                                    Text(monitor.currentStatus.label)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if !viewModel.maintenances.isEmpty {
-                Section(String(localized: "Maintenance")) {
-                    ForEach(viewModel.maintenances.prefix(3)) { maintenance in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(maintenance.title)
-                                .lineLimit(2)
-                            if let startDate = maintenance.startDate {
-                                Text(startDate, format: .relative(presentation: .named))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if !viewModel.recentIncidents.isEmpty {
-                Section(String(localized: "Recent incidents")) {
-                    ForEach(viewModel.recentIncidents.prefix(3)) { incident in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Circle()
-                                    .fill(incident.color)
-                                    .frame(width: 6, height: 6)
-                                Text(incident.title)
-                                    .lineLimit(2)
-                            }
-
-                            if let detail = incident.detail, !detail.isEmpty {
-                                Text(detail)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-
-                            if let date = incident.date {
-                                Text(date, format: .relative(presentation: .named))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .overlay {
-            if viewModel.isLoading {
-                ProgressView()
-            }
-        }
-        .task(id: connection.id) {
-            if viewModel.result == nil && !viewModel.isLoading {
-                await viewModel.refresh(connection: connection)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    isShowingSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-            }
-
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Task { await viewModel.refresh(connection: connection) }
-                } label: {
-                    if viewModel.isLoading {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-                .disabled(viewModel.isLoading)
-            }
-        }
-        .sheet(isPresented: $isShowingSettings) {
-            WatchConnectionForm(
-                initialConnection: connection,
-                onSave: { updatedConnection in
-                    handleSave(connection: updatedConnection)
-                    isShowingSettings = false
-                },
+    private var mainContent: some View {
+        if let connection = configurationStore.connection {
+            WatchDashboard(
+                connection: connection,
+                viewModel: viewModel,
+                isShowingSettings: $isShowingSettings,
+                onSave: handleSave(connection:),
                 onDelete: {
                     configurationStore.clear()
                     viewModel.clearSnapshot()
                     isShowingSettings = false
                 }
             )
+        } else {
+            NavigationStack {
+                WatchConnectionWizard(onComplete: handleSave(connection:))
+                    .navigationTitle(String(localized: "Setup"))
+            }
         }
     }
 
@@ -205,21 +64,222 @@ struct WatchRootView: View {
     }
 }
 
-private struct WatchConnectionForm: View {
-    let initialConnection: ServerConnection?
+// MARK: - Dashboard
+
+private struct WatchDashboard: View {
+    let connection: ServerConnection
+    @Bindable var viewModel: WatchDashboardViewModel
+    @Binding var isShowingSettings: Bool
     let onSave: (ServerConnection) -> Void
-    var onDelete: (() -> Void)?
+    let onDelete: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 12) {
+                    // Status orb hero
+                    WatchStatusOrbView(summary: viewModel.summary)
+                        .padding(.top, 4)
 
-    @State private var name: String
-    @State private var selectedProtocol: String
-    @State private var ipOctet1: Int
-    @State private var ipOctet2: Int
-    @State private var ipOctet3: Int
-    @State private var ipOctet4: Int
-    @State private var selectedPort: Int
-    @State private var statusPageSlug: String
+                    // Status label
+                    Text(viewModel.summary.label)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(viewModel.summary.color)
+                        .staggeredAppear(index: 0, baseDelay: 0.3)
+
+                    // Server name + last refresh
+                    VStack(spacing: 2) {
+                        if let title = viewModel.result?.title, !title.isEmpty {
+                            Text(title)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.5))
+                        } else {
+                            Text(connection.name)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+
+                        if let lastRefresh = viewModel.lastRefreshDate {
+                            Text(lastRefresh, format: .relative(presentation: .named))
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white.opacity(0.35))
+                        }
+                    }
+                    .staggeredAppear(index: 1, baseDelay: 0.3)
+
+                    // Error message
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.appStatusDown)
+                            .multilineTextAlignment(.center)
+                            .glassCard(glowColor: .appStatusDown)
+                    }
+
+                    // Monitor cards
+                    if !viewModel.monitors.isEmpty {
+                        VStack(spacing: 8) {
+                            ForEach(
+                                Array(viewModel.monitors.prefix(12).enumerated()),
+                                id: \.element.id
+                            ) { index, monitor in
+                                NavigationLink {
+                                    WatchMonitorDetailView(
+                                        monitor: monitor,
+                                        latestHeartbeat: viewModel.latestHeartbeat(for: monitor.id)
+                                    )
+                                } label: {
+                                    WatchMonitorCardView(
+                                        monitor: monitor,
+                                        latestHeartbeat: viewModel.latestHeartbeat(for: monitor.id),
+                                        index: index
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Maintenance section
+                    if !viewModel.maintenances.isEmpty {
+                        WatchSectionHeader(title: String(localized: "Maintenance"), index: 13)
+
+                        ForEach(
+                            Array(viewModel.maintenances.prefix(3).enumerated()),
+                            id: \.element.id
+                        ) { index, maintenance in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(maintenance.title)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(2)
+                                if let startDate = maintenance.startDate {
+                                    Text(startDate, format: .relative(presentation: .named))
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.white.opacity(0.45))
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .glassCard(glowColor: .blue.opacity(0.5))
+                            .staggeredAppear(index: 14 + index)
+                        }
+                    }
+
+                    // Incidents section
+                    if !viewModel.recentIncidents.isEmpty {
+                        WatchSectionHeader(title: String(localized: "Recent incidents"), index: 17)
+
+                        ForEach(
+                            Array(viewModel.recentIncidents.prefix(3).enumerated()),
+                            id: \.element.id
+                        ) { index, incident in
+                            HStack(alignment: .top, spacing: 8) {
+                                Circle()
+                                    .fill(incident.color)
+                                    .frame(width: 6, height: 6)
+                                    .padding(.top, 4)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(incident.title)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(2)
+
+                                    if let detail = incident.detail, !detail.isEmpty {
+                                        Text(detail)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.white.opacity(0.45))
+                                            .lineLimit(2)
+                                    }
+
+                                    if let date = incident.date {
+                                        Text(date, format: .relative(presentation: .named))
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(.white.opacity(0.35))
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .glassCard(glowColor: incident.color)
+                            .staggeredAppear(index: 18 + index)
+                        }
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.bottom, 16)
+            }
+            .background(Color.black)
+            .overlay {
+                if viewModel.isLoading && viewModel.result != nil {
+                    // Subtle refresh indicator (not blocking)
+                    VStack {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .padding(4)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+            .task(id: connection.id) {
+                if viewModel.result == nil && !viewModel.isLoading {
+                    await viewModel.refresh(connection: connection)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        isShowingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .foregroundStyle(.kumaGreen)
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await viewModel.refresh(connection: connection) }
+                    } label: {
+                        if viewModel.isLoading {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundStyle(.kumaGreen)
+                        }
+                    }
+                    .disabled(viewModel.isLoading)
+                }
+            }
+            .sheet(isPresented: $isShowingSettings) {
+                WatchConnectionSettings(
+                    connection: connection,
+                    onSave: { updated in
+                        onSave(updated)
+                        isShowingSettings = false
+                    },
+                    onDelete: onDelete
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Connection Wizard (first time)
+
+struct WatchConnectionWizard: View {
+    let onComplete: (ServerConnection) -> Void
+
+    @State private var step = 0
+    @State private var selectedProtocol = "http"
+    @State private var ipOctet1 = 192
+    @State private var ipOctet2 = 168
+    @State private var ipOctet3 = 1
+    @State private var ipOctet4 = 1
+    @State private var selectedPort = 3001
+    @State private var statusPageSlug = ""
+    @State private var serverName = ""
     @State private var isConnecting = false
     @State private var connectError: String?
 
@@ -229,21 +289,304 @@ private struct WatchConnectionForm: View {
     private static let portRange = 1000...19999
 
     init(
-        initialConnection: ServerConnection?,
+        service: any MonitoringServiceProtocol = UptimeKumaService(),
+        onComplete: @escaping (ServerConnection) -> Void
+    ) {
+        self.service = service
+        self.onComplete = onComplete
+    }
+
+    private let totalSteps = 5
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Progress dots
+            HStack(spacing: 6) {
+                ForEach(0..<totalSteps, id: \.self) { i in
+                    Circle()
+                        .fill(i <= step ? Color.kumaGreen : Color.white.opacity(0.2))
+                        .frame(width: 5, height: 5)
+                        .scaleEffect(i == step ? 1.3 : 1.0)
+                        .animation(.spring(response: 0.3), value: step)
+                }
+            }
+            .padding(.bottom, 8)
+
+            // Step content
+            TabView(selection: $step) {
+                wizardProtocol.tag(0)
+                wizardIP.tag(1)
+                wizardPort.tag(2)
+                wizardSlug.tag(3)
+                wizardConfirm.tag(4)
+            }
+            .tabViewStyle(.verticalPage)
+        }
+        .background(Color.black)
+    }
+
+    // Step 0: Protocol
+    private var wizardProtocol: some View {
+        VStack(spacing: 12) {
+            WizardStepLabel(title: String(localized: "Protocol"))
+
+            Picker(String(localized: "Protocol"), selection: $selectedProtocol) {
+                ForEach(Self.protocols, id: \.self) { proto in
+                    Text(proto.uppercased())
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .tag(proto)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 60)
+
+            WizardNextButton { step = 1 }
+        }
+        .glassCard(glowColor: .kumaGreen)
+    }
+
+    // Step 1: IP Address
+    private var wizardIP: some View {
+        VStack(spacing: 8) {
+            WizardStepLabel(title: String(localized: "IP Address"))
+
+            HStack(spacing: 2) {
+                wizardOctetPicker($ipOctet1)
+                wizardDot
+                wizardOctetPicker($ipOctet2)
+                wizardDot
+                wizardOctetPicker($ipOctet3)
+                wizardDot
+                wizardOctetPicker($ipOctet4)
+            }
+
+            Text("\(ipOctet1).\(ipOctet2).\(ipOctet3).\(ipOctet4)")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.kumaGreen)
+
+            WizardNextButton { step = 2 }
+        }
+        .glassCard(glowColor: .kumaGreen)
+    }
+
+    // Step 2: Port
+    private var wizardPort: some View {
+        VStack(spacing: 8) {
+            WizardStepLabel(title: String(localized: "Port"))
+
+            Picker(String(localized: "Port"), selection: $selectedPort) {
+                ForEach(Self.portRange, id: \.self) { port in
+                    Text(String(port))
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .tag(port)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 60)
+
+            Text(":\(selectedPort)")
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundStyle(.kumaGreen)
+
+            WizardNextButton { step = 3 }
+        }
+        .glassCard(glowColor: .kumaGreen)
+    }
+
+    // Step 3: Slug
+    private var wizardSlug: some View {
+        VStack(spacing: 8) {
+            WizardStepLabel(title: String(localized: "Status Page Slug"))
+
+            TextField(String(localized: "slug"), text: $statusPageSlug)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.system(size: 14, design: .monospaced))
+
+            WizardNextButton(disabled: statusPageSlug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                step = 4
+            }
+        }
+        .glassCard(glowColor: .kumaGreen)
+    }
+
+    // Step 4: Confirm & Connect
+    private var wizardConfirm: some View {
+        VStack(spacing: 8) {
+            WizardStepLabel(title: String(localized: "Confirm"))
+
+            VStack(alignment: .leading, spacing: 4) {
+                wizardSummaryRow(String(localized: "URL"), composedURLString)
+                wizardSummaryRow(String(localized: "Slug"), statusPageSlug)
+            }
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .foregroundStyle(.white.opacity(0.7))
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let error = connectError {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.appStatusDown)
+                    .lineLimit(3)
+            }
+
+            Button {
+                Task { await connect() }
+            } label: {
+                if isConnecting {
+                    ProgressView()
+                } else {
+                    Text(String(localized: "Connect"))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.kumaGreen)
+            .disabled(isConnecting)
+        }
+        .glassCard(glowColor: .kumaGreen)
+    }
+
+    private func wizardSummaryRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(.white.opacity(0.45))
+            Spacer()
+            Text(value)
+                .lineLimit(1)
+                .foregroundStyle(.kumaGreenLight)
+        }
+    }
+
+    private func wizardOctetPicker(_ value: Binding<Int>) -> some View {
+        Picker("", selection: value) {
+            ForEach(0...255, id: \.self) { n in
+                Text(String(n))
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .tag(n)
+            }
+        }
+        .pickerStyle(.wheel)
+        .frame(width: 36, height: 50)
+        .clipped()
+    }
+
+    private var wizardDot: some View {
+        Text(".")
+            .font(.system(size: 16, weight: .bold, design: .monospaced))
+            .foregroundStyle(.kumaGreen)
+    }
+
+    private var composedURLString: String {
+        "\(selectedProtocol)://\(ipOctet1).\(ipOctet2).\(ipOctet3).\(ipOctet4):\(selectedPort)"
+    }
+
+    private func connect() async {
+        connectError = nil
+        guard let baseURL = ServerConnection.validatedBaseURL(from: composedURLString),
+              let slug = ServerConnection.validatedStatusPageSlug(from: statusPageSlug)
+        else {
+            connectError = String(localized: "Invalid URL")
+            return
+        }
+
+        let name = serverName.isEmpty ? String(localized: "My Kuma Server") : serverName
+        let draft = ServerConnection(
+            id: UUID(),
+            name: ServerConnection.normalizedDisplayName(from: name),
+            baseURL: baseURL,
+            statusPageSlug: slug,
+            isDefault: true
+        )
+
+        isConnecting = true
+        defer { isConnecting = false }
+
+        do {
+            _ = try await service.validateConnection(draft)
+            onComplete(draft)
+        } catch {
+            connectError = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Wizard Helpers
+
+private struct WizardStepLabel: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .foregroundStyle(.kumaGreenLight)
+            .textCase(.uppercase)
+    }
+}
+
+private struct WizardNextButton: View {
+    var disabled: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.35)) {
+                action()
+            }
+        } label: {
+            Image(systemName: "arrow.right.circle.fill")
+                .font(.system(size: 24))
+                .foregroundStyle(.kumaGreen)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.4 : 1)
+    }
+}
+
+// MARK: - Connection Settings (after first time) — TabView pages
+
+struct WatchConnectionSettings: View {
+    let connection: ServerConnection
+    let onSave: (ServerConnection) -> Void
+    let onDelete: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var selectedProtocol: String
+    @State private var ipOctet1: Int
+    @State private var ipOctet2: Int
+    @State private var ipOctet3: Int
+    @State private var ipOctet4: Int
+    @State private var selectedPort: Int
+    @State private var statusPageSlug: String
+    @State private var name: String
+    @State private var isConnecting = false
+    @State private var connectError: String?
+    @State private var selectedTab = 0
+
+    private let service: any MonitoringServiceProtocol
+
+    private static let protocols = ["http", "https"]
+    private static let portRange = 1000...19999
+
+    init(
+        connection: ServerConnection,
         service: any MonitoringServiceProtocol = UptimeKumaService(),
         onSave: @escaping (ServerConnection) -> Void,
-        onDelete: (() -> Void)? = nil
+        onDelete: @escaping () -> Void
     ) {
-        self.initialConnection = initialConnection
+        self.connection = connection
         self.service = service
         self.onSave = onSave
         self.onDelete = onDelete
 
-        _name = State(initialValue: initialConnection?.name ?? String(localized: "My Kuma Server"))
-        _statusPageSlug = State(initialValue: initialConnection?.statusPageSlug ?? "")
+        _name = State(initialValue: connection.name)
+        _statusPageSlug = State(initialValue: connection.statusPageSlug)
 
-        if let url = initialConnection?.baseURL,
-           let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+        if let components = URLComponents(url: connection.baseURL, resolvingAgainstBaseURL: false) {
             let octets = (components.host ?? "").split(separator: ".").compactMap { Int($0) }
             _selectedProtocol = State(initialValue: components.scheme ?? "http")
             _ipOctet1 = State(initialValue: octets.count > 0 ? octets[0] : 192)
@@ -263,94 +606,204 @@ private struct WatchConnectionForm: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                TextField(String(localized: "Server"), text: $name)
-            }
-
-            Section(String(localized: "Protocol")) {
-                Picker(String(localized: "Protocol"), selection: $selectedProtocol) {
-                    ForEach(Self.protocols, id: \.self) { proto in
-                        Text(proto.uppercased()).tag(proto)
-                    }
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Tab selector
+                HStack(spacing: 0) {
+                    settingsTabButton(String(localized: "Server"), systemImage: "server.rack", tab: 0)
+                    settingsTabButton(String(localized: "Network"), systemImage: "network", tab: 1)
+                    settingsTabButton(String(localized: "Danger"), systemImage: "exclamationmark.triangle", tab: 2)
                 }
-            }
+                .padding(.horizontal, 4)
+                .padding(.bottom, 4)
 
-            Section(String(localized: "IP Address")) {
-                HStack(spacing: 2) {
-                    octetPicker($ipOctet1)
-                    dot
-                    octetPicker($ipOctet2)
-                    dot
-                    octetPicker($ipOctet3)
-                    dot
-                    octetPicker($ipOctet4)
+                TabView(selection: $selectedTab) {
+                    // Tab 0: Server
+                    serverTab.tag(0)
+                    // Tab 1: Network
+                    networkTab.tag(1)
+                    // Tab 2: Danger zone
+                    dangerTab.tag(2)
                 }
-                .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
+                .tabViewStyle(.verticalPage)
             }
-
-            Section(String(localized: "Port")) {
-                Picker(String(localized: "Port"), selection: $selectedPort) {
-                    ForEach(Self.portRange, id: \.self) { port in
-                        Text(String(port)).tag(port)
-                    }
-                }
-                .pickerStyle(.wheel)
-            }
-
-            Section {
-                TextField(String(localized: "Status Page Slug"), text: $statusPageSlug)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
-
-            if let connectError {
-                Section {
-                    Text(connectError)
-                        .font(.caption2)
-                        .foregroundStyle(.red)
-                }
-            }
-
-            Section {
-                Button {
-                    Task { await connect() }
-                } label: {
-                    if isConnecting {
-                        ProgressView()
-                    } else {
-                        Text(String(localized: "Save"))
-                    }
-                }
-                .disabled(isConnecting || !hasMinimumInput)
-
-                if let onDelete {
-                    Button(role: .destructive) {
-                        onDelete()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                }
-            }
+            .background(Color.black)
+            .navigationTitle(String(localized: "Settings"))
         }
     }
 
-    private var dot: some View {
-        Text(".")
-            .font(.title3.bold())
-            .foregroundStyle(.secondary)
+    private func settingsTabButton(_ label: String, systemImage: String, tab: Int) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.3)) {
+                selectedTab = tab
+            }
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12))
+                Text(label)
+                    .font(.system(size: 8, weight: .medium))
+            }
+            .foregroundStyle(selectedTab == tab ? .kumaGreen : .white.opacity(0.4))
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
     }
 
-    private func octetPicker(_ value: Binding<Int>) -> some View {
+    // Tab 0: Server info
+    private var serverTab: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "Name"))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.kumaGreenLight)
+                    TextField(String(localized: "Server"), text: $name)
+                        .font(.system(size: 13))
+                }
+                .glassCard(glowColor: .kumaGreenDim)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "Status Page Slug"))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.kumaGreenLight)
+                    TextField(String(localized: "slug"), text: $statusPageSlug)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.system(size: 13, design: .monospaced))
+                }
+                .glassCard(glowColor: .kumaGreenDim)
+
+                saveButton
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+
+    // Tab 1: Network
+    private var networkTab: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "Protocol"))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.kumaGreenLight)
+                    Picker(String(localized: "Protocol"), selection: $selectedProtocol) {
+                        ForEach(Self.protocols, id: \.self) { proto in
+                            Text(proto.uppercased()).tag(proto)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(height: 50)
+                }
+                .glassCard(glowColor: .kumaGreenDim)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "IP Address"))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.kumaGreenLight)
+                    HStack(spacing: 2) {
+                        settingsOctetPicker($ipOctet1)
+                        settingsDot
+                        settingsOctetPicker($ipOctet2)
+                        settingsDot
+                        settingsOctetPicker($ipOctet3)
+                        settingsDot
+                        settingsOctetPicker($ipOctet4)
+                    }
+                    Text("\(ipOctet1).\(ipOctet2).\(ipOctet3).\(ipOctet4)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.kumaGreen)
+                }
+                .glassCard(glowColor: .kumaGreenDim)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "Port"))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.kumaGreenLight)
+                    Picker(String(localized: "Port"), selection: $selectedPort) {
+                        ForEach(Self.portRange, id: \.self) { port in
+                            Text(String(port)).tag(port)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(height: 50)
+                    Text(":\(selectedPort)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.kumaGreen)
+                }
+                .glassCard(glowColor: .kumaGreenDim)
+
+                saveButton
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+
+    // Tab 2: Danger zone
+    private var dangerTab: some View {
+        VStack(spacing: 12) {
+            Spacer()
+
+            Button(role: .destructive) {
+                onDelete()
+                dismiss()
+            } label: {
+                Label(String(localized: "Delete Server"), systemImage: "trash")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .glassCard(glowColor: .appStatusDown)
+
+            Spacer()
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var saveButton: some View {
+        VStack(spacing: 4) {
+            if let error = connectError {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.appStatusDown)
+                    .lineLimit(3)
+            }
+
+            Button {
+                Task { await connect() }
+            } label: {
+                if isConnecting {
+                    ProgressView()
+                } else {
+                    Text(String(localized: "Save"))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.kumaGreen)
+            .disabled(isConnecting || !hasMinimumInput)
+        }
+    }
+
+    private func settingsOctetPicker(_ value: Binding<Int>) -> some View {
         Picker("", selection: value) {
             ForEach(0...255, id: \.self) { n in
-                Text(String(n)).tag(n)
+                Text(String(n))
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .tag(n)
             }
         }
         .pickerStyle(.wheel)
-        .frame(width: 38, height: 50)
+        .frame(width: 36, height: 50)
         .clipped()
+    }
+
+    private var settingsDot: some View {
+        Text(".")
+            .font(.system(size: 16, weight: .bold, design: .monospaced))
+            .foregroundStyle(.kumaGreen)
     }
 
     private var hasMinimumInput: Bool {
@@ -363,7 +816,6 @@ private struct WatchConnectionForm: View {
 
     private func connect() async {
         connectError = nil
-
         guard let baseURL = ServerConnection.validatedBaseURL(from: composedURLString),
               let slug = ServerConnection.validatedStatusPageSlug(from: statusPageSlug)
         else {
@@ -372,7 +824,7 @@ private struct WatchConnectionForm: View {
         }
 
         let draft = ServerConnection(
-            id: initialConnection?.id ?? UUID(),
+            id: connection.id,
             name: ServerConnection.normalizedDisplayName(from: name),
             baseURL: baseURL,
             statusPageSlug: slug,
@@ -385,7 +837,6 @@ private struct WatchConnectionForm: View {
         do {
             _ = try await service.validateConnection(draft)
             onSave(draft)
-            dismiss()
         } catch {
             connectError = error.localizedDescription
         }
