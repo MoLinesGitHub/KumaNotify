@@ -3,9 +3,6 @@ import SwiftUI
 // MARK: - Color Tokens
 
 extension Color {
-    static let kumaGreen = Color(red: 0.36, green: 0.87, blue: 0.55) // #5CDD8B
-    static let kumaGreenLight = Color(red: 0.55, green: 0.94, blue: 0.72) // #8CF0B8
-    static let kumaGreenDim = Color(red: 0.20, green: 0.50, blue: 0.32) // #338052
     static let kumaGlassBorder = Color.white.opacity(0.15)
     static let kumaGlassFill = Color.white.opacity(0.06)
     static let kumaGlassHighlight = Color.white.opacity(0.12)

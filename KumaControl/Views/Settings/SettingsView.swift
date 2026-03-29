@@ -433,20 +433,10 @@ struct SettingsView: View {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top, spacing: 12) {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.blue.opacity(0.18), .mint.opacity(0.18)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 44, height: 44)
-                            .overlay {
-                                Image(systemName: "sparkles")
-                                    .font(.title3)
-                                    .foregroundStyle(.blue)
-                            }
+                        Image("MolinesLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 62, height: 62)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Built by Molines Designs")

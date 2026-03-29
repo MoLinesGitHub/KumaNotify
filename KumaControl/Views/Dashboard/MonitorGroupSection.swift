@@ -14,12 +14,12 @@ struct MonitorGroupSection: View {
     var onToggleAcknowledge: ((UnifiedMonitor) -> Void)?
 
     private let columns = [
-        GridItem(.adaptive(minimum: 88, maximum: 100), spacing: 6)
+        GridItem(.adaptive(minimum: 94, maximum: 106), spacing: 8)
     ]
 
     var body: some View {
         Section {
-            LazyVGrid(columns: columns, spacing: 8) {
+            LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(group.monitors, id: \.id) { monitor in
                     Button {
                         onMonitorTap?(monitor)
@@ -41,29 +41,43 @@ struct MonitorGroupSection: View {
                     .accessibilityIdentifier("dashboard.monitor.\(monitor.id)")
                 }
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
         } header: {
             HStack(spacing: 6) {
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(sectionColor)
-                    .frame(width: 3, height: 12)
+                // Colored glass pill
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [sectionColor.opacity(0.8), sectionColor.opacity(0.3)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 3, height: 14)
+                    .shadow(color: sectionColor.opacity(0.4), radius: 3)
 
                 Text(group.name)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
                     .textCase(.uppercase)
-                    .tracking(1.2)
+                    .tracking(1.0)
 
                 Spacer()
 
                 let up = group.monitors.filter { $0.currentStatus == .up }.count
-                Text("\(up)/\(group.monitors.count)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                HStack(spacing: 3) {
+                    Text("\(up)")
+                        .foregroundStyle(Color.kumaGreen)
+                    Text("/")
+                        .foregroundStyle(.tertiary)
+                    Text("\(group.monitors.count)")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.vertical, 6)
             .background(.background)
         }
     }
@@ -71,9 +85,9 @@ struct MonitorGroupSection: View {
     private var sectionColor: Color {
         let allUp = group.monitors.allSatisfy { $0.currentStatus == .up }
         let anyDown = group.monitors.contains { $0.currentStatus == .down }
-        if anyDown { return .red }
-        if allUp { return .green }
-        return .yellow
+        if anyDown { return .appStatusDown }
+        if allUp { return .kumaGreen }
+        return .appStatusDegraded
     }
 
     private func prefFor(_ monitor: UnifiedMonitor) -> MonitorPreferenceSnapshot? {

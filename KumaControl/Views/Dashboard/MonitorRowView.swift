@@ -12,7 +12,7 @@ struct MonitorRowView: View {
     var onToggleHidden: (() -> Void)?
     var onToggleAcknowledge: (() -> Void)?
 
-    private static let bubbleSize: CGFloat = 82
+    private static let bubbleSize: CGFloat = 88
     @State private var isHovered = false
 
     private var pingText: String? {
@@ -57,37 +57,71 @@ struct MonitorRowView: View {
     var body: some View {
         VStack(spacing: 3) {
             ZStack {
-                // Outer glow ring
+                // Outer glow pulse
                 Circle()
-                    .fill(statusColor.opacity(0.08))
-                    .frame(width: Self.bubbleSize + 6, height: Self.bubbleSize + 6)
-
-                // Filled bubble with status color
-                Circle()
-                    .fill(statusColor.opacity(0.6))
-                    .frame(width: Self.bubbleSize, height: Self.bubbleSize)
-
-                // Inner ring
-                Circle()
-                    .strokeBorder(statusColor.opacity(0.6), lineWidth: 2)
-                    .frame(width: Self.bubbleSize, height: Self.bubbleSize)
-
-                // Highlight arc (glass refraction)
-                Circle()
-                    .trim(from: 0.0, to: 0.3)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white.opacity(0.25), .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        lineWidth: 1
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                statusColor.opacity(0.15),
+                                statusColor.opacity(0.03),
+                                .clear,
+                            ],
+                            center: .center,
+                            startRadius: Self.bubbleSize * 0.2,
+                            endRadius: Self.bubbleSize * 0.6
+                        )
                     )
-                    .frame(width: Self.bubbleSize - 4, height: Self.bubbleSize - 4)
-                    .rotationEffect(.degrees(-60))
+                    .frame(width: Self.bubbleSize + 10, height: Self.bubbleSize + 10)
+
+                // Glass orb body
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                statusColor.opacity(0.55),
+                                statusColor.opacity(0.25),
+                                statusColor.opacity(0.08),
+                            ],
+                            center: UnitPoint(x: 0.35, y: 0.3),
+                            startRadius: 0,
+                            endRadius: Self.bubbleSize * 0.5
+                        )
+                    )
+                    .frame(width: Self.bubbleSize, height: Self.bubbleSize)
+
+                // Glass highlight (top-left reflection)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.white.opacity(0.30),
+                                Color.white.opacity(0.05),
+                                .clear,
+                            ],
+                            center: UnitPoint(x: 0.3, y: 0.25),
+                            startRadius: 0,
+                            endRadius: Self.bubbleSize * 0.3
+                        )
+                    )
+                    .frame(width: Self.bubbleSize, height: Self.bubbleSize)
+
+                // Glass border
+                Circle()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.25),
+                                Color.white.opacity(0.05),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.7
+                    )
+                    .frame(width: Self.bubbleSize, height: Self.bubbleSize)
 
                 // Content
-                VStack(spacing: 1) {
+                VStack(spacing: 2) {
                     if isPinned {
                         Image(systemName: "pin.fill")
                             .font(.system(size: 7))
@@ -95,22 +129,23 @@ struct MonitorRowView: View {
                     }
 
                     Text(shortName)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
                         .lineLimit(3)
                         .multilineTextAlignment(.center)
-                        .minimumScaleFactor(0.65)
+                        .minimumScaleFactor(0.6)
                         .padding(.horizontal, 8)
+                        .foregroundStyle(.white)
 
                     if let pingText {
                         Text(pingText)
-                            .font(.system(size: 8, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.65))
                     }
                 }
             }
-            .shadow(color: statusColor.opacity(monitor.currentStatus == .down ? 0.5 : 0.2), radius: monitor.currentStatus == .down ? 8 : 3)
+            .shadow(color: statusColor.opacity(monitor.currentStatus == .down ? 0.6 : 0.25), radius: monitor.currentStatus == .down ? 10 : 4)
             .scaleEffect(isHovered ? 1.08 : 1.0)
-            .animation(.easeOut(duration: 0.15), value: isHovered)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovered)
         }
         .opacity(isHidden ? 0.35 : 1.0)
         .onHover { isHovered = $0 }

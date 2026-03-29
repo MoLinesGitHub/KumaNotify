@@ -63,58 +63,147 @@ struct KumaControlWidgetEntryView: View {
     }
 
     private func statusView(_ data: WidgetData) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(statusColor(WidgetDataPresentation.statusColorKey(for: data.overallStatusRaw)))
-                    .frame(width: 10, height: 10)
-                Text(WidgetDataPresentation.statusLabel(for: data))
-                    .font(.headline)
-                    .lineLimit(1)
-            }
+        let stateColor = resolveStatusColor(data.overallStatusRaw)
 
-            if WidgetDataPresentation.shouldShowSummary(for: data) {
-                Text(data.monitorSummaryLine)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
+        return ZStack {
+            // Glass background
+            ContainerRelativeShape()
+                .fill(Color.black)
 
-            if let serverName = data.serverName {
-                Text(serverName)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
+            ContainerRelativeShape()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            stateColor.opacity(0.12),
+                            stateColor.opacity(0.03),
+                            Color.clear,
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
 
-            Spacer()
+            // Glass highlight edge
+            ContainerRelativeShape()
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.15),
+                            Color.white.opacity(0.03),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
 
-            if let time = data.lastCheckTime {
-                Text(time, format: .relative(presentation: .numeric))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            // Content
+            VStack(alignment: .leading, spacing: 6) {
+                // Status orb + label
+                HStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        stateColor.opacity(0.7),
+                                        stateColor.opacity(0.2),
+                                    ],
+                                    center: UnitPoint(x: 0.35, y: 0.3),
+                                    startRadius: 0,
+                                    endRadius: 8
+                                )
+                            )
+                            .frame(width: 14, height: 14)
+
+                        Circle()
+                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                            .frame(width: 14, height: 14)
+                    }
+                    .shadow(color: stateColor.opacity(0.4), radius: 4)
+
+                    Text(WidgetDataPresentation.statusLabel(for: data))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+
+                // Monitor count
+                if WidgetDataPresentation.shouldShowSummary(for: data) {
+                    Text(data.monitorSummaryLine)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
+
+                Spacer(minLength: 0)
+
+                // Server name
+                if let serverName = data.serverName {
+                    Text(serverName)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.35))
+                        .lineLimit(1)
+                }
+
+                // Last check
+                if let time = data.lastCheckTime {
+                    Text(time, format: .relative(presentation: .numeric))
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.25))
+                }
             }
+            .padding(12)
         }
-        .padding()
     }
 
     private var noDataView: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                .font(.title2)
-                .foregroundStyle(.secondary)
-            Text(String(localized: "Open Kuma Control to start monitoring"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        ZStack {
+            ContainerRelativeShape()
+                .fill(Color.black)
+
+            ContainerRelativeShape()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.kumaGreen.opacity(0.06),
+                            Color.clear,
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            ContainerRelativeShape()
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.1),
+                            Color.white.opacity(0.02),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+
+            VStack(spacing: 8) {
+                Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Color.kumaGreen.opacity(0.4))
+                Text(String(localized: "Abre Kuma Control para monitorizar"))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(12)
         }
-        .padding()
     }
 
-    private func statusColor(_ key: String) -> Color {
-        switch key {
-        case "green": .appStatusUp
-        case "yellow": .appStatusDegraded
-        case "red": .appStatusDown
+    private func resolveStatusColor(_ overallStatusRaw: String) -> Color {
+        switch overallStatusRaw {
+        case "allUp": .kumaGreen
+        case "degraded": .appStatusDegraded
+        case "someDown": .appStatusDown
         default: .appStatusOffline
         }
     }
