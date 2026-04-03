@@ -53,15 +53,18 @@ struct MenuBarLabel: View {
             switch viewModel.iconStyle {
             case .sfSymbol:
                 statusIcon(size: Metrics.iconOnlySize)
+                    .symbolEffect(.pulse, isActive: viewModel.hasActiveIncident)
 
             case .colorDot:
                 Image(systemName: "circle.fill")
                     .font(.system(size: 8))
                     .foregroundStyle(viewModel.statusColor)
+                    .symbolEffect(.pulse, isActive: viewModel.hasActiveIncident)
 
             case .textAndIcon:
                 HStack(spacing: 3) {
                     statusIcon(size: Metrics.textAndIconSize)
+                        .symbolEffect(.pulse, isActive: viewModel.hasActiveIncident)
                     if !viewModel.menuBarTitle.isEmpty {
                         Text(viewModel.menuBarTitle)
                             .monospacedDigit()

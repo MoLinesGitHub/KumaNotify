@@ -7,7 +7,7 @@ final class StoreManager {
     private(set) var proUnlocked = false
 
     #if DEBUG
-    var debugProOverride: Bool? = true
+    var debugProOverride: Bool?
 
     var effectiveProUnlocked: Bool {
         debugProOverride ?? proUnlocked

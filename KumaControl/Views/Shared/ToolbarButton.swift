@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ToolbarButton: View {
     let systemName: String
+    var label: String?
     let action: () -> Void
 
     @State private var isHovered = false
@@ -19,5 +20,6 @@ struct ToolbarButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .accessibilityLabel(label ?? systemName)
     }
 }

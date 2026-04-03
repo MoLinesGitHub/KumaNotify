@@ -7,7 +7,8 @@ final class PowerMonitor {
     private(set) var isOnBattery = false
     private(set) var batteryLevel: Double = 1.0
 
-    private var runLoopSource: CFRunLoopSource?
+    @ObservationIgnored
+    nonisolated(unsafe) private var runLoopSource: CFRunLoopSource?
 
     func start() {
         updatePowerState()
@@ -22,6 +23,12 @@ final class PowerMonitor {
         }, context).takeRetainedValue()
 
         CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .defaultMode)
+    }
+
+    deinit {
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .defaultMode)
+        }
     }
 
     func stop() {

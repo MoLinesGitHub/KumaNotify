@@ -136,7 +136,14 @@ struct KumaControlApp: App {
         let engine = PollingEngine()
         let sm = StoreManager()
         #if DEBUG
-        if uiTestForcesPro || uiTestShowsSettings || uiTestShowsDashboard {
+        let isUITest = uiTestShowsOnboarding || uiTestShowsSettings || uiTestShowsPaywall
+            || uiTestShowsDashboard || uiTestOpensRestoredDashboard || uiTestSeedsServerConnection
+        if isUITest {
+            if uiTestForcesPro || uiTestShowsSettings || uiTestShowsDashboard {
+                sm.debugProOverride = true
+            }
+            // Otherwise debugProOverride stays nil (Pro off) for tests that need Basic mode
+        } else {
             sm.debugProOverride = true
         }
         #endif

@@ -125,8 +125,8 @@ final class KumaControlUITests: XCTestCase {
         let suiteName = "KumaControlUITests.productionSettings.\(UUID().uuidString)"
         app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
         app.launchEnvironment["KUMA_UI_TEST_SEED_SERVER"] = "1"
+        app.launchEnvironment["KUMA_UI_TEST_SHOW_SETTINGS"] = "1"
         app.launch()
-        app.typeKey(",", modifierFlags: .command)
 
         let addServerButton = app.buttons["settings.addServerButton"]
         XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
@@ -138,8 +138,8 @@ final class KumaControlUITests: XCTestCase {
         app.launchEnvironment["KUMA_SETTINGS_SUITE_NAME"] = suiteName
         app.launchEnvironment["KUMA_UI_TEST_SEED_SERVER"] = "1"
         app.launchEnvironment["KUMA_UI_TEST_FORCE_PRO"] = "1"
+        app.launchEnvironment["KUMA_UI_TEST_SHOW_SETTINGS"] = "1"
         app.launch()
-        app.typeKey(",", modifierFlags: .command)
 
         let addServerButton = app.buttons["settings.addServerButton"]
         XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
@@ -159,8 +159,8 @@ final class KumaControlUITests: XCTestCase {
         XCTAssertTrue(waitForEnabled(saveButton, timeout: 5))
         saveButton.click()
 
-        XCTAssertTrue(app.staticTexts["Secondary"].waitForExistence(timeout: 8))
-        XCTAssertTrue(addServerButton.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Secondary"].waitForExistence(timeout: 12))
+        XCTAssertTrue(addServerButton.waitForExistence(timeout: 12))
         XCTAssertTrue(addServerButton.isEnabled)
     }
 

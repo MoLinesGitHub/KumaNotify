@@ -423,6 +423,26 @@ struct SettingsView: View {
                     set: { settingsStore.launchAtLogin = $0 }
                 ))
             }
+
+            #if DEBUG
+            if let storeManager {
+                Section("Debug") {
+                    HStack {
+                        Image(systemName: isPro ? "crown.fill" : "crown")
+                            .foregroundStyle(isPro ? .yellow : .secondary)
+                        Text(isPro ? "Pro Unlocked" : "Basic Mode")
+                            .font(.body)
+                        Spacer()
+                        Button(isPro ? "Switch to Basic" : "Unlock Pro") {
+                            storeManager.debugProOverride = !isPro
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(isPro ? .secondary : .yellow)
+                        .controlSize(.small)
+                    }
+                }
+            }
+            #endif
         }
         .formStyle(.grouped)
         .padding()
